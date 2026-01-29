@@ -1,4 +1,4 @@
--- Auto Teleport Script Nikaa
+-- Auto Teleport Script Nikaa (79xv)
 -- Total Locations: 16 Start unlock farm
 
 -- Step 1: Point 1
@@ -126,6 +126,14 @@ print("Teleporting to Point 16...");
 local player = game.Players.LocalPlayer;
 if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
   player.Character.HumanoidRootPart.CFrame = CFrame.new(-1357.4528, 0.85162246, -32.93776);
+end
+task.wait(1);
+
+-- Step 17: Point 17 (end)
+print("Teleporting to Point 17...");
+local player = game.Players.LocalPlayer;
+if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+  player.Character.HumanoidRootPart.CFrame = CFrame.new(-1172.4102, 0.757999300, -203.68950);
 end
 task.wait(1);
 
