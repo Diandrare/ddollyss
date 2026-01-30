@@ -1,4 +1,4 @@
-![header](https://capsule-render.vercel.app/api?type=cylinder&height=250&color=gradient&text=Nikaa%20&textBg=false&section=header&fontColor=000770&fontSize=100&animation=twinkling&rotate=0&stroke=000000&strokeWidth=1)
+![header](https://capsule-render.vercel.app/api?type=waving&height=300&color=0:F74AC6,50:a40778&text=N1kaa&section=header&animation=blinking&fontSize=100)
 
 <div align="center">
 
