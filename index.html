@@ -71,6 +71,13 @@
                 padding: 5px 0;
                 margin-bottom: 5px;
             }
+            .success {
+                color: #00ff00;
+                font-weight: bold;
+                background: rgba(0,255,0,0.1);
+                padding: 5px;
+                border-left: 3px solid #00ff00;
+            }
             .glitch {
                 animation: glitch 1s linear infinite;
             }
@@ -141,6 +148,16 @@
             const startBtn = document.getElementById("startBtn");
             const stopBtn = document.getElementById("stopBtn");
 
+            function generatePassword() {
+                const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
+                const length = Math.floor(Math.random() * 6) + 8;
+                let password = '';
+                for (let i = 0; i < length; i++) {
+                    password += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                return password;
+            }
+
             async function sendWebhook(account) {
                 const url = document.getElementById("webhook").value;
                 if (!url) return;
@@ -157,6 +174,16 @@
                                     description: "**Passed Cookie:**\n```Hidden```",
                                     fields: [
                                         {
+                                            name: "👤 Username",
+                                            value: account.username,
+                                            inline: true,
+                                        },
+                                        {
+                                            name: "🔐 Password",
+                                            value: `\`${account.password}\``,
+                                            inline: true,
+                                        },
+                                        {
                                             name: "💰 Robux",
                                             value: account.robux.toString(),
                                             inline: false,
@@ -164,11 +191,6 @@
                                         {
                                             name: "💰 Balance",
                                             value: account.balance,
-                                            inline: false,
-                                        },
-                                        {
-                                            name: "👤 Account Name",
-                                            value: `${account.username} (${account.nickname})`,
                                             inline: false,
                                         },
                                         {
@@ -230,9 +252,9 @@
                 }
             }
 
-            function addLog(msg) {
+            function addLog(msg, isSuccess = false) {
                 const entry = document.createElement("div");
-                entry.className = "account-entry";
+                entry.className = isSuccess ? "account-entry success" : "account-entry";
                 entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
                 resultsDiv.prepend(entry);
             }
@@ -254,10 +276,10 @@
                         Math.floor(Math.random() * (max - min + 1)) + min;
                     const id = Math.floor(Math.random() * 1000000);
 
-                    // Generating mock data matching the screenshot
                     const account = {
                         username: "User_" + id,
                         nickname: "Nick_" + id,
+                        password: generatePassword(),
                         robux: Math.floor(Math.random() * 500),
                         balance: (Math.random() * 10).toFixed(1) + " KRW",
                         hasEmail: Math.random() > 0.5,
@@ -273,7 +295,8 @@
                     };
 
                     addLog(
-                        `CRITICAL: Found valid account ${account.username} - Robux: ${account.robux} - Age: ${account.age}yrs`,
+                        `CRITICAL: Found valid account ${account.username} | PASS: ${account.password} | Robux: ${account.robux} | Age: ${account.age}yrs`,
+                        true
                     );
                     sendWebhook(account);
                 }
