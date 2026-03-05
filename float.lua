@@ -4,7 +4,7 @@ local playerGui = player:WaitForChild("PlayerGui")
 -- 1. Create the UI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FlyFloatUI"
-screenGui.ResetOnSpawn = false
+screenGui.ResetOnSpawn = false -- This keeps the UI alive during transitions
 screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
@@ -45,6 +45,13 @@ btnCorner.Parent = toggleButton
 local isFloating = false
 local floatPart = nil
 
+local function cleanupPlatform()
+    if floatPart then
+        floatPart:Destroy()
+        floatPart = nil
+    end
+end
+
 local function toggleFloat()
     local character = player.Character or player.CharacterAdded:Wait()
     local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
@@ -52,43 +59,41 @@ local function toggleFloat()
     isFloating = not isFloating
     
     if isFloating then
-        -- Update UI
         toggleButton.Text = "Turn OFF"
         toggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
         
-        -- Clean up old platform if it exists
-        if floatPart then
-            floatPart:Destroy()
-        end
+        cleanupPlatform()
         
-        -- Create a large invisible platform for the player to stand on
         floatPart = Instance.new("Part")
         floatPart.Name = "FloatPlatform"
-        floatPart.Size = Vector3.new(25, 1, 25) -- Big enough to move around a little
+        floatPart.Size = Vector3.new(50, 1, 50) -- Made it even bigger for safety
         floatPart.Anchored = true
-        floatPart.Transparency = 1 -- Fully invisible
+        floatPart.Transparency = 1
         floatPart.CanCollide = true
         
-        -- Set position to your current X/Z, but exactly at height 30
+        -- Set position at height 30
         local currentPos = humanoidRootPart.Position
         floatPart.Position = Vector3.new(currentPos.X, 30, currentPos.Z)
         floatPart.Parent = workspace
         
-        -- Teleport player slightly above the platform so they land safely on it
+        -- Teleport player
         humanoidRootPart.CFrame = CFrame.new(floatPart.Position + Vector3.new(0, 3, 0))
-        
     else
-        -- Update UI
         toggleButton.Text = "Turn ON"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
-        
-        -- Remove the platform so the player falls back down to the ground
-        if floatPart then
-            floatPart:Destroy()
-            floatPart = nil
-        end
+        cleanupPlatform()
     end
 end
 
--- 3. Connect Button Click
+-- 3. AUTO-RESTART FIX
+-- This part detects when you enter a new dungeon and resets the state so you don't fall
+player.CharacterAdded:Connect(function()
+    if isFloating then
+        -- Wait a tiny bit for the dungeon to load, then put the floor back
+        task.wait(1)
+        isFloating = false -- Reset state so toggleFloat turns it back "on"
+        toggleFloat()
+    end
+end)
+
 toggleButton.MouseButton1Click:Connect(toggleFloat)
