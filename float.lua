@@ -3,13 +3,13 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 -- 1. Create the UI
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FreezeUI"
-screenGui.ResetOnSpawn = false -- Keeps the UI even if the player dies
+screenGui.Name = "FlyFloatUI"
+screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 200, 0, 100)
-frame.Position = UDim2.new(0.5, -100, 0.8, -50) -- Positioned near the bottom center
+frame.Position = UDim2.new(0.5, -100, 0.8, -50)
 frame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 frame.BorderSizePixel = 0
 frame.Parent = screenGui
@@ -20,11 +20,11 @@ corner.Parent = frame
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "Altitude Freeze"
+title.Text = "Float Toggle (Height 30)"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
-title.TextSize = 16
+title.TextSize = 14
 title.Parent = frame
 
 local toggleButton = Instance.new("TextButton")
@@ -42,44 +42,53 @@ btnCorner.CornerRadius = UDim.new(0, 8)
 btnCorner.Parent = toggleButton
 
 -- 2. State & Logic
-local isFrozen = false
+local isFloating = false
+local floatPart = nil
 
-local function toggleFreeze()
+local function toggleFloat()
     local character = player.Character or player.CharacterAdded:Wait()
     local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
     
-    isFrozen = not isFrozen
+    isFloating = not isFloating
     
-    if isFrozen then
-        -- Update UI to show OFF state
+    if isFloating then
+        -- Update UI
         toggleButton.Text = "Turn OFF"
         toggleButton.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
         
-        -- Teleport the character up to a medium altitude
-        local mediumAltitude = 25
-        humanoidRootPart.CFrame = humanoidRootPart.CFrame + Vector3.new(0, mediumAltitude, 0)
-
-        -- Freeze the character by anchoring all their body parts
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Anchored = true
-            end
+        -- Clean up old platform if it exists
+        if floatPart then
+            floatPart:Destroy()
         end
-        print("Frozen at medium altitude!")
+        
+        -- Create a large invisible platform for the player to stand on
+        floatPart = Instance.new("Part")
+        floatPart.Name = "FloatPlatform"
+        floatPart.Size = Vector3.new(25, 1, 25) -- Big enough to move around a little
+        floatPart.Anchored = true
+        floatPart.Transparency = 1 -- Fully invisible
+        floatPart.CanCollide = true
+        
+        -- Set position to your current X/Z, but exactly at height 30
+        local currentPos = humanoidRootPart.Position
+        floatPart.Position = Vector3.new(currentPos.X, 30, currentPos.Z)
+        floatPart.Parent = workspace
+        
+        -- Teleport player slightly above the platform so they land safely on it
+        humanoidRootPart.CFrame = CFrame.new(floatPart.Position + Vector3.new(0, 3, 0))
+        
     else
-        -- Update UI to show ON state
+        -- Update UI
         toggleButton.Text = "Turn ON"
         toggleButton.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
         
-        -- Unfreeze the character by unanchoring all their body parts
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.Anchored = false
-            end
+        -- Remove the platform so the player falls back down to the ground
+        if floatPart then
+            floatPart:Destroy()
+            floatPart = nil
         end
-        print("Unfrozen!")
     end
 end
 
 -- 3. Connect Button Click
-toggleButton.MouseButton1Click:Connect(toggleFreeze)
+toggleButton.MouseButton1Click:Connect(toggleFloat)
