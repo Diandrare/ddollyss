@@ -11,7 +11,7 @@ ScreenGui.ResetOnSpawn = false
 -- GUI Styling
 Frame.Parent = ScreenGui
 Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-Frame.BorderColor3 = Color3.fromRGB(0, 255, 128) -- Neon Green
+Frame.BorderColor3 = Color3.fromRGB(153, 153, 255) -- Neon Green
 Frame.BorderSizePixel = 2
 Frame.Position = UDim2.new(0.1, 0, 0.5, 0)
 Frame.Size = UDim2.new(0, 200, 0, 120)
@@ -21,7 +21,7 @@ Frame.Draggable = true
 Title.Parent = Frame
 Title.BackgroundTransparency = 1
 Title.Size = UDim2.new(1, 0, 0, 30)
-Title.Text = "Speed Control"
+Title.Text = "Speed Perm"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.TextSize = 18
 Title.Font = Enum.Font.SourceSansBold
@@ -30,7 +30,7 @@ Input.Parent = Frame
 Input.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 Input.Position = UDim2.new(0.1, 0, 0.35, 0)
 Input.Size = UDim2.new(0.8, 0, 0, 30)
-Input.Text = "100"
+Input.Text = "90"
 Input.TextColor3 = Color3.fromRGB(255, 255, 255)
 Input.TextSize = 18
 
