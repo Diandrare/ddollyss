@@ -2,7 +2,7 @@ local player = game.Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 
-local SPEED = 80 -- Change Speed N1k
+local SPEED = 90 -- Change Speed N1k
 
 -- Set initial speed
 humanoid.WalkSpeed = SPEED
