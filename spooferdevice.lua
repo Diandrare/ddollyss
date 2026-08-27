@@ -1,6 +1,6 @@
 -- =====================================================
 --   DEVICE SPOOFER + AUTO REJOIN - BLADE BALL
---   VERSI KHUSUS DELTA EXECUTOR
+--   VERSI DELTA (ERROR FIXED)
 -- =====================================================
 
 local Players = game:GetService("Players")
@@ -10,60 +10,68 @@ local RunService = game:GetService("RunService")
 local LP = Players.LocalPlayer
 
 -- =====================================================
---   CEK APAKAH SUDAH PERNAH DIJALANKAN
+--   CEK STATUS SCRIPT
 -- =====================================================
 
 if not getgenv().BLADE_SPOOF_RAN then
     getgenv().BLADE_SPOOF_RAN = true
 else
-    print("[Spoofer] Sudah dijalankan sebelumnya, skip rejoin")
+    print("[Spoofer] Sudah dijalankan, skip rejoin")
 end
 
 -- =====================================================
---   SPOOFING DEVICE (CARA YANG DIDUKUNG DELTA)
+--   SPOOFING DEVICE
 -- =====================================================
 
--- Delta TIDAK mendukung setfflag(), jadi kita pakai cara lain:
--- 1. Hook fungsi GetDeviceType
--- 2. Manipulasi properti UserInputService
+-- Simpan fungsi asli (jika ada)
+local originalGetDeviceType = UserInputService.GetDeviceType
 
-local function spoofDevice()
-    -- Override GetDeviceType agar selalu return Computer
-    local oldGetDeviceType = UserInputService.GetDeviceType
-    UserInputService.GetDeviceType = function(self)
-        return Enum.DeviceType.Computer
-    end
-    print("[Spoofer] GetDeviceType di-hook => Computer")
-    
-    -- Coba manipulasi properti internal (jika ada)
-    -- Beberapa executor mendukung ini
+-- Fungsi override yang aman
+local function overrideDeviceType()
     pcall(function()
+        -- Ganti method GetDeviceType agar selalu return Computer
+        UserInputService.GetDeviceType = function()
+            return Enum.DeviceType.Computer
+        end
+    end)
+end
+
+-- Fungsi spoof properti tambahan (hanya jika bisa)
+local function spoofProperties()
+    pcall(function()
+        -- Coba set properti (mungkin readonly, tapi kita coba)
         UserInputService.TouchEnabled = false
         UserInputService.MouseEnabled = true
         UserInputService.KeyboardEnabled = true
         UserInputService.AccelerometerEnabled = false
     end)
-    print("[Spoofer] Properti input diset ke mode PC")
+end
+
+-- Gabungkan semua spoof
+local function applySpoof()
+    overrideDeviceType()
+    spoofProperties()
+    print("[Spoofer] Device spoof applied")
 end
 
 -- =====================================================
 --   AUTO REJOIN
 -- =====================================================
 
-local function rejoin()
+local function doRejoin()
     local placeId = game.PlaceId
     if not placeId then
-        warn("[Rejoin] Gagal dapat PlaceId")
+        warn("[Rejoin] PlaceId tidak ditemukan")
         return
     end
     
-    -- Delta mendukung TeleportService:Teleport
     local success, err = pcall(function()
         TeleportService:Teleport(placeId, LP)
     end)
     
     if not success then
-        print("[Rejoin] Teleport gagal, coba metode kick...")
+        print("[Rejoin] Teleport gagal: " .. tostring(err))
+        -- Fallback: kick
         LP:Kick("Rejoining for device spoof...")
     else
         print("[Rejoin] Teleport berhasil!")
@@ -74,31 +82,28 @@ end
 --   EKSEKUSI UTAMA
 -- =====================================================
 
-print("[Spoofer] Menerapkan spoofing...")
-spoofDevice()
+applySpoof()
 
 -- Tunggu sebentar agar spoof efektif
 task.wait(1.5)
 
 if not getgenv().BLADE_SPOOF_RAN then
-    print("[Spoofer] Melakukan rejoin...")
-    rejoin()
-else
-    print("[Spoofer] Spoof sudah aktif, tidak perlu rejoin")
+    doRejoin()
 end
 
 -- =====================================================
---   HOOK PERMANEN (AGAR TETAP AKTIF)
+--   JAGA SPOOF TETAP AKTIF (HEARTBEAT HOOK)
 -- =====================================================
 
--- Jalankan di setiap frame untuk memastikan spoof tetap aktif
 RunService.Heartbeat:Connect(function()
-    -- Jika ada deteksi ulang, kita override lagi
-    if UserInputService.GetDeviceType ~= spoofDevice then
-        UserInputService.GetDeviceType = function()
-            return Enum.DeviceType.Computer
+    -- Re-apply spoof setiap frame untuk mengatasi reset
+    pcall(function()
+        if UserInputService.GetDeviceType ~= nil then
+            UserInputService.GetDeviceType = function()
+                return Enum.DeviceType.Computer
+            end
         end
-    end
+    end)
 end)
 
-print("[Spoofer] Script selesai! Device sekarang terdeteksi sebagai PC.")
+print("[Spoofer] Script selesai, device di-spoof sebagai PC")
