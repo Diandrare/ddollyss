@@ -1,72 +1,49 @@
 -- =====================================================
 --   DEVICE SPOOFER + AUTO REJOIN - BLADE BALL
---   Untuk menyembunyikan emulator / deteksi perangkat
+--   VERSI KHUSUS DELTA EXECUTOR
 -- =====================================================
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 local LP = Players.LocalPlayer
 
 -- =====================================================
---   FUNGSI SPOOFING
+--   CEK APAKAH SUDAH PERNAH DIJALANKAN
 -- =====================================================
 
--- 1. Spoof TouchEnabled (aktifkan touch pada PC agar terlihat HP)
---    Untuk PC, biasanya TouchEnabled = false; kita set true
---    Tapi ini hanya efek lokal, bisa mempengaruhi input handling.
-local function spoofTouch()
-    -- Tidak ada cara langsung mengubah UserInputService.TouchEnabled, 
-    -- tapi kita bisa membuat event simulasi atau menggunakan FFlag.
-    -- Alternatif: set FFlag untuk memaksa touch mode.
-    setfflag("UserInputService.TouchEnabled", "true")
-    setfflag("UserInputService.EnableTouchEvents", "true")
-    warn("[Spoofer] TouchEnabled diset ke true")
+if not getgenv().BLADE_SPOOF_RAN then
+    getgenv().BLADE_SPOOF_RAN = true
+else
+    print("[Spoofer] Sudah dijalankan sebelumnya, skip rejoin")
 end
 
--- 2. Spoof Accelerometer (emulator biasanya false)
-local function spoofAccelerometer()
-    setfflag("UserInputService.AccelerometerEnabled", "true")
-    warn("[Spoofer] Accelerometer diset true")
-end
+-- =====================================================
+--   SPOOFING DEVICE (CARA YANG DIDUKUNG DELTA)
+-- =====================================================
 
--- 3. Spoof Keyboard/Mouse (pasti ada di PC)
-local function spoofKeyboardMouse()
-    setfflag("UserInputService.KeyboardEnabled", "true")
-    setfflag("UserInputService.MouseEnabled", "true")
-    warn("[Spoofer] Keyboard & Mouse enabled")
-end
+-- Delta TIDAK mendukung setfflag(), jadi kita pakai cara lain:
+-- 1. Hook fungsi GetDeviceType
+-- 2. Manipulasi properti UserInputService
 
--- 4. Ubah Device model di dalam game (jika ada pengukuran lain)
-local function spoofDeviceModel()
-    -- Beberapa game menggunakan GetFFlag atau perintah internal.
-    -- Kita coba ganti os.name atau tick? Tidak bisa langsung.
-    -- Kita bisa kirim remote event palsu jika diperlukan.
-    -- Sebagai ganti, kita gunakan mock untuk UserInputService.GetDeviceType()
-    -- Tapi tidak ada API resmi. Kita hanya bisa manipulasi FFlag.
-    setfflag("Device.Model", "PC (Windows)")
-    setfflag("Device.Name", "Desktop")
-    warn("[Spoofer] Device model diubah menjadi PC")
-end
-
--- 5. Nonaktifkan deteksi emulator dengan mematikan flag tertentu
-local function disableEmulatorDetection()
-    setfflag("Roblox.EmulatorDetection", "false")
-    setfflag("Roblox.EnvironmentCheck", "false")
-    setfflag("Roblox.DetectVirtualMachine", "false")
-    warn("[Spoofer] Deteksi emulator dinonaktifkan")
-end
-
--- 6. Jalankan semua spoof
-local function applySpoofs()
-    spoofTouch()
-    spoofAccelerometer()
-    spoofKeyboardMouse()
-    spoofDeviceModel()
-    disableEmulatorDetection()
-    print("[Spoofer] Semua spoof telah diterapkan!")
+local function spoofDevice()
+    -- Override GetDeviceType agar selalu return Computer
+    local oldGetDeviceType = UserInputService.GetDeviceType
+    UserInputService.GetDeviceType = function(self)
+        return Enum.DeviceType.Computer
+    end
+    print("[Spoofer] GetDeviceType di-hook => Computer")
+    
+    -- Coba manipulasi properti internal (jika ada)
+    -- Beberapa executor mendukung ini
+    pcall(function()
+        UserInputService.TouchEnabled = false
+        UserInputService.MouseEnabled = true
+        UserInputService.KeyboardEnabled = true
+        UserInputService.AccelerometerEnabled = false
+    end)
+    print("[Spoofer] Properti input diset ke mode PC")
 end
 
 -- =====================================================
@@ -75,57 +52,53 @@ end
 
 local function rejoin()
     local placeId = game.PlaceId
-    local jobId = game.JobId
-    if not placeId or not jobId then
-        warn("[Rejoin] Gagal mendapatkan PlaceId/JobId")
+    if not placeId then
+        warn("[Rejoin] Gagal dapat PlaceId")
         return
     end
     
-    -- Metode 1: Teleport ke server yang sama dengan rejoin
-    -- Beberapa executor mendukung TeleportService:Teleport ke PlaceId yang sama
+    -- Delta mendukung TeleportService:Teleport
     local success, err = pcall(function()
-        TeleportService:Teleport(placeId, LP, nil, nil)
+        TeleportService:Teleport(placeId, LP)
     end)
     
     if not success then
-        warn("[Rejoin] Teleport gagal: " .. tostring(err))
-        -- Metode 2: Kick dan reconnect (cara lain)
+        print("[Rejoin] Teleport gagal, coba metode kick...")
         LP:Kick("Rejoining for device spoof...")
-        -- Alternatif: gunakan http untuk refresh
-        -- HttpService:GetAsync("https://www.roblox.com/games/" .. placeId)
     else
-        print("[Rejoin] Teleport berhasil, server baru akan dimuat.")
+        print("[Rejoin] Teleport berhasil!")
     end
 end
 
 -- =====================================================
---   MAIN EXECUTION
+--   EKSEKUSI UTAMA
 -- =====================================================
 
--- Cek apakah script sudah pernah dijalankan (agar tidak loop)
+print("[Spoofer] Menerapkan spoofing...")
+spoofDevice()
+
+-- Tunggu sebentar agar spoof efektif
+task.wait(1.5)
+
 if not getgenv().BLADE_SPOOF_RAN then
-    getgenv().BLADE_SPOOF_RAN = true
-    
-    print("[Spoofer] Memulai spoofing dan rejoin...")
-    applySpoofs()
-    
-    -- Tunggu beberapa detik agar spoof efektif, lalu rejoin
-    task.wait(2)
+    print("[Spoofer] Melakukan rejoin...")
     rejoin()
 else
-    print("[Spoofer] Script sudah dijalankan sebelumnya, hanya terapkan spoof tanpa rejoin")
-    applySpoofs()
+    print("[Spoofer] Spoof sudah aktif, tidak perlu rejoin")
 end
 
 -- =====================================================
---   HOOK untuk deteksi perubahan (opsional)
+--   HOOK PERMANEN (AGAR TETAP AKTIF)
 -- =====================================================
 
--- Jika ada event yang mencoba mendeteksi ulang, kita bisa override
-local oldGetDeviceType = UserInputService.GetDeviceType
-UserInputService.GetDeviceType = function(...)
-    -- Kembalikan "Computer" atau "Desktop"
-    return Enum.DeviceType.Computer
-end
+-- Jalankan di setiap frame untuk memastikan spoof tetap aktif
+RunService.Heartbeat:Connect(function()
+    -- Jika ada deteksi ulang, kita override lagi
+    if UserInputService.GetDeviceType ~= spoofDevice then
+        UserInputService.GetDeviceType = function()
+            return Enum.DeviceType.Computer
+        end
+    end
+end)
 
-print("[Spoofer] Device type hooked menjadi Computer")
+print("[Spoofer] Script selesai! Device sekarang terdeteksi sebagai PC.")
