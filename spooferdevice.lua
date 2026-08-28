@@ -1,6 +1,6 @@
 -- ===== KONFIGURASI =====
 local SPOOF_DEVICE = "PC"     
-local AUTO_REJOIN = true      
+local AUTO_REJOIN = false      
 local REJOIN_DELAY = 2        
 
 if not SPOOF_DEVICE then return end
