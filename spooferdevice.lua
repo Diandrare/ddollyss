@@ -1,109 +1,153 @@
--- =====================================================
---   DEVICE SPOOFER + AUTO REJOIN - BLADE BALL
---   VERSI DELTA (ERROR FIXED)
--- =====================================================
+-- ===== KONFIGURASI =====
+local SPOOF_DEVICE = "PC"     
+local AUTO_REJOIN = true      
+local REJOIN_DELAY = 2        
 
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local TeleportService = game:GetService("TeleportService")
-local RunService = game:GetService("RunService")
-local LP = Players.LocalPlayer
+if not SPOOF_DEVICE then return end
 
--- =====================================================
---   CEK STATUS SCRIPT
--- =====================================================
-
-if not getgenv().BLADE_SPOOF_RAN then
-    getgenv().BLADE_SPOOF_RAN = true
-else
-    print("[Spoofer] Sudah dijalankan, skip rejoin")
-end
-
--- =====================================================
---   SPOOFING DEVICE
--- =====================================================
-
--- Simpan fungsi asli (jika ada)
-local originalGetDeviceType = UserInputService.GetDeviceType
-
--- Fungsi override yang aman
-local function overrideDeviceType()
-    pcall(function()
-        -- Ganti method GetDeviceType agar selalu return Computer
-        UserInputService.GetDeviceType = function()
-            return Enum.DeviceType.Computer
-        end
-    end)
-end
-
--- Fungsi spoof properti tambahan (hanya jika bisa)
-local function spoofProperties()
-    pcall(function()
-        -- Coba set properti (mungkin readonly, tapi kita coba)
-        UserInputService.TouchEnabled = false
-        UserInputService.MouseEnabled = true
-        UserInputService.KeyboardEnabled = true
-        UserInputService.AccelerometerEnabled = false
-    end)
-end
-
--- Gabungkan semua spoof
+-- ===== FUNGSI SPOOF =====
 local function applySpoof()
-    overrideDeviceType()
-    spoofProperties()
-    print("[Spoofer] Device spoof applied")
-end
+    local RS = game:GetService("ReplicatedStorage")
+    local UserInputService = game:GetService("UserInputService")
 
--- =====================================================
---   AUTO REJOIN
--- =====================================================
-
-local function doRejoin()
-    local placeId = game.PlaceId
-    if not placeId then
-        warn("[Rejoin] PlaceId tidak ditemukan")
-        return
-    end
-    
-    local success, err = pcall(function()
-        TeleportService:Teleport(placeId, LP)
-    end)
-    
-    if not success then
-        print("[Rejoin] Teleport gagal: " .. tostring(err))
-        -- Fallback: kick
-        LP:Kick("Rejoining for device spoof...")
-    else
-        print("[Rejoin] Teleport berhasil!")
-    end
-end
-
--- =====================================================
---   EKSEKUSI UTAMA
--- =====================================================
-
-applySpoof()
-
--- Tunggu sebentar agar spoof efektif
-task.wait(1.5)
-
-if not getgenv().BLADE_SPOOF_RAN then
-    doRejoin()
-end
-
--- =====================================================
---   JAGA SPOOF TETAP AKTIF (HEARTBEAT HOOK)
--- =====================================================
-
-RunService.Heartbeat:Connect(function()
-    -- Re-apply spoof setiap frame untuk mengatasi reset
+    -- Patch module UserInputService
+    local wrap = nil
     pcall(function()
-        if UserInputService.GetDeviceType ~= nil then
-            UserInputService.GetDeviceType = function()
-                return Enum.DeviceType.Computer
+        wrap = require(RS:WaitForChild("UserInputService"))
+    end)
+    if wrap and type(wrap) == "table" then
+        local flags = {
+            PC = { TouchEnabled = false, MouseEnabled = true, KeyboardEnabled = true, GamepadEnabled = false },
+            Phone = { TouchEnabled = true, MouseEnabled = false, KeyboardEnabled = false, GamepadEnabled = false },
+            Console = { TouchEnabled = false, MouseEnabled = false, KeyboardEnabled = false, GamepadEnabled = true }
+        }
+        local f = flags[SPOOF_DEVICE]
+        if f then
+            for k, v in pairs(f) do
+                rawset(wrap, k, v)
+            end
+        end
+        local last = Enum.UserInputType.MouseMovement
+        if SPOOF_DEVICE == "Console" then
+            last = Enum.UserInputType.Gamepad1
+        elseif SPOOF_DEVICE == "Phone" then
+            last = Enum.UserInputType.Touch
+        end
+        rawset(wrap, "GetLastInputType", function()
+            return last
+        end)
+    end
+
+    -- Patch DeviceListener
+    pcall(function()
+        local DL = require(RS:WaitForChild("ClientGameModules"):WaitForChild("DeviceListener"))
+        if DL then
+            DL.Device = SPOOF_DEVICE
+            if DL.State and DL.State.Set then
+                DL.State:Set(SPOOF_DEVICE)
+            end
+            if DL.OnChange and DL.OnChange.Fire then
+                DL.OnChange:Fire(SPOOF_DEVICE)
             end
         end
     end)
-end)
 
-print("[Spoofer] Script selesai, device di-spoof sebagai PC")
+    -- Hook connections (jika support)
+    if getconnections and getupvalue and setupvalue then
+        pcall(function()
+            for _, c in getconnections(UserInputService.LastInputTypeChanged) do
+                local fn = c.Function
+                if type(fn) == "function" then
+                    local u1 = getupvalue(fn, 1)
+                    local u2 = getupvalue(fn, 2)
+                    if type(u1) == "function" and type(u2) == "table" and u2.OnChange then
+                        setupvalue(fn, 1, function()
+                            return SPOOF_DEVICE
+                        end)
+                    end
+                end
+            end
+        end)
+    end
+
+    getgenv()._WindsSpoofDevice = SPOOF_DEVICE
+    print("[Spoofer] Device set to: " .. SPOOF_DEVICE)
+end
+
+-- ===== FUNGSI REJOIN =====
+local function doRejoin()
+    local TeleportService = game:GetService("TeleportService")
+    local Players = game:GetService("Players")
+    local LP = Players.LocalPlayer
+    local placeId = game.PlaceId
+    if placeId then
+        pcall(function()
+            TeleportService:Teleport(placeId, LP)
+        end)
+        print("[Rejoin] Rejoin ke server baru...")
+    else
+        warn("[Rejoin] Gagal dapat PlaceId")
+    end
+end
+
+-- ===== EKSEKUSI UTAMA =====
+print("[Spoofer] Menerapkan spoof...")
+applySpoof()
+
+if AUTO_REJOIN then
+    print("[Rejoin] Akan rejoin dalam " .. REJOIN_DELAY .. " detik...")
+    task.wait(REJOIN_DELAY)
+    doRejoin()
+else
+    print("[Spoofer] Selesai (tanpa rejoin)")
+end
+
+-- ===== PASTIKAN SPOOF BERTAHAN SETELAH TELEPORT =====
+local function setupPersistence()
+    local qot = syn and syn.queue_on_teleport or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
+    if type(qot) == "function" then
+        qot([[
+            local SPOOF_DEVICE = "]] .. SPOOF_DEVICE .. [["
+            local function reapply()
+                local RS = game:GetService("ReplicatedStorage")
+                local wrap = nil
+                pcall(function() wrap = require(RS:WaitForChild("UserInputService")) end)
+                if wrap and type(wrap) == "table" then
+                    local flags = {
+                        PC = { TouchEnabled = false, MouseEnabled = true, KeyboardEnabled = true, GamepadEnabled = false },
+                        Phone = { TouchEnabled = true, MouseEnabled = false, KeyboardEnabled = false, GamepadEnabled = false },
+                        Console = { TouchEnabled = false, MouseEnabled = false, KeyboardEnabled = false, GamepadEnabled = true }
+                    }
+                    local f = flags[SPOOF_DEVICE]
+                    if f then
+                        for k, v in pairs(f) do
+                            rawset(wrap, k, v)
+                        end
+                    end
+                    local last = Enum.UserInputType.MouseMovement
+                    if SPOOF_DEVICE == "Console" then last = Enum.UserInputType.Gamepad1
+                    elseif SPOOF_DEVICE == "Phone" then last = Enum.UserInputType.Touch end
+                    rawset(wrap, "GetLastInputType", function() return last end)
+                end
+                getgenv()._WindsSpoofDevice = SPOOF_DEVICE
+                print("[Spoofer] Re-applied after teleport")
+            end
+            game:IsLoaded() and reapply() or game.Loaded:Connect(reapply)
+        ]])
+        print("[Spoofer] Persistence via queue_on_teleport registered")
+    else
+        pcall(function()
+            local TeleportService = game:GetService("TeleportService")
+            TeleportService.TeleportInitFinished:Connect(function()
+                task.wait(1)
+                applySpoof()
+                print("[Spoofer] Re-applied via TeleportInitFinished")
+            end)
+            print("[Spoofer] Persistence via TeleportInitFinished registered")
+        end)
+    end
+end
+
+setupPersistence()
+
+print("[Spoofer] Script selesai. Device: " .. SPOOF_DEVICE .. (AUTO_REJOIN and " (auto rejoin aktif)" or " (tanpa auto rejoin)"))
