@@ -166,7 +166,7 @@ for _, Function in getgc(true) do
 end
 
 if not _tokenFound then
-    Fluent:Notify({Title="EAGLE Hub X", Content="Token tapılmadı!", Duration=5})
+    Fluent:Notify({Title="Nika Hub X", Content="Token ADA!", Duration=5})
     return
 end
 
@@ -240,9 +240,9 @@ task.spawn(function()
         attempts = attempts + 1
     end
     if _capturedRemote then
-        Fluent:Notify({Title="EAGLE Hub X", Content="Remote tapıldı ✓", Duration=3})
+        Fluent:Notify({Title="Nika Hub X", Content="Remote ditemukan ✓", Duration=3})
     else
-        Fluent:Notify({Title="EAGLE Hub X", Content="Remote tapılmadı!", Duration=5})
+        Fluent:Notify({Title="Nika Hub X", Content="Remote gagal!", Duration=5})
     end
 end)
 
@@ -1008,7 +1008,7 @@ local function create_mobile_ui_button()
     end
     
     local gui = Instance.new('ScreenGui')
-    gui.Name = 'EagleHubMobileUIButton'
+    gui.Name = 'NikaHubMobileUIButton'
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -1057,7 +1057,7 @@ end
 
 local function create_mobile_button(name, position_y, color, toggleName)
     local gui = Instance.new('ScreenGui')
-    gui.Name = 'EagleHub_' .. name .. '_Mobile'
+    gui.Name = 'NikaHub_' .. name .. '_Mobile'
     gui.ResetOnSpawn = false
     gui.IgnoreGuiInset = true
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -1815,7 +1815,7 @@ ball_velocity_section:AddToggle("BallVelocity", {
 -- ============================================================
 
 local PingGui = Instance.new("ScreenGui", CoreGui)
-PingGui.Name = "EagleRealPing"
+PingGui.Name = "NikaRealPing"
 PingGui.ResetOnSpawn = false
 PingGui.IgnoreGuiInset = true
 PingGui.DisplayOrder = 999
@@ -1870,7 +1870,7 @@ ball_velocity_section:AddToggle("ShowPing", {
 })
 
 -- ============================================================
--- ========== AUTO JUMP (Eagle free66-dan) ==========
+-- ========== AUTO JUMP (Nika free66-dan) ==========
 -- ============================================================
 
 local AutoJump = false
@@ -1889,7 +1889,7 @@ auto_jump_section:AddToggle("AutoJump", {
     end
 })
 
--- Heartbeat-də Auto Jump (Eagle free66-dan)
+-- Heartbeat-də Auto Jump (Nika free66-dan)
 RunService.Heartbeat:Connect(function()
     if AutoJump then
         local char = LocalPlayer.Character
@@ -2031,8 +2031,8 @@ no_render_section:AddToggle("NoRender", {
 SaveManager:SetLibrary(Fluent)
 InterfaceManager:SetLibrary(Fluent)
 SaveManager:IgnoreThemeSettings()
-InterfaceManager:SetFolder("EAGLE Hub X")
-SaveManager:SetFolder("EAGLE Hub X/configs")
+InterfaceManager:SetFolder("Nika Hub X")
+SaveManager:SetFolder("Nika Hub X/configs")
 InterfaceManager:BuildInterfaceSection(Tabs.Settings)
 SaveManager:BuildConfigSection(Tabs.Settings)
 
