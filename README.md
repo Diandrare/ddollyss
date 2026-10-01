@@ -33,7 +33,8 @@
 
 <!-- ═══════════════ ANIMATED CAT ═══════════════ -->
 <div align="center">
-    <img src="https://tenor.com" width="150" alt="Anime Neko Sleeping">
+    <img src="https://githubusercontent.com" width="120" alt="Neko Typing">
+
 </div>
 
 <!-- ═══════════════ DIVIDER ═══════════════ -->
