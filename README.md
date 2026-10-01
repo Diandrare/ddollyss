@@ -167,8 +167,8 @@
 <h2 align="center">🏆 Holopin Badges</h2>
 
 <p align="center">
-  <a href="https://holopin.io/@YOUR_HOLOPIN_USERNAME">
-    <img src="https://holopin.me/YOUR_HOLOPIN_USERNAME" />
+  <a href="https://holopin.io/@diandrare">
+    <img src="diandrare" />
   </a>
 </p>
 
