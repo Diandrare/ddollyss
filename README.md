@@ -33,7 +33,7 @@
 
 <!-- ═══════════════ ANIMATED CAT ═══════════════ -->
 <div align="center">
-    <img src="https://githubusercontent.com" width="120" alt="Neko Typing">
+    <img src="https://githubusercontent.com" width="180" alt="Bongo Neko">
 
 </div>
 
