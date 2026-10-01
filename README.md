@@ -128,8 +128,8 @@
   <a href="https://github.com/Diandrare/ddollyss">
     <img src="https://github-readme-stats.vercel.app/api/pin/?username=Diandrare&repo=ddollyss&theme=radical&hide_border=true" />
   </a>
-  <a href="https://github.com/Diandrare/REPO_NAME_2">
-    <img src="https://github-readme-stats.vercel.app/api/pin/?username=Diandrare&repo=REPO_NAME_2&theme=radical&hide_border=true" />
+  <a href="https://github.com/Diandrare/aboutnika">
+    <img src="https://github-readme-stats.vercel.app/api/pin/?username=Diandrare&repo=aboutnika&theme=radical&hide_border=true" />
   </a>
 </p>
 
