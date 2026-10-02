@@ -1,9 +1,9 @@
 --== AUTO COPY LINK ON START ==--
 pcall(function()
     if setclipboard then 
-        setclipboard("https://youtube.com/@invis_in") 
+        setclipboard("https://discoord.gg/u5jfs8dm3Y") 
     elseif toclipboard then 
-        toclipboard("https://youtube.com/@invis_in") 
+        toclipboard("https://discoord.gg/u5jfs8dm3Y") 
     end
 end)
 
@@ -1404,7 +1404,7 @@ UserInputService.InputChanged:Connect(function(i) if mDrag and (i.UserInputType 
 UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then mDrag = false end end)
 
 local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 42); Title.Text = "⚡ INVIS HUB PREMIUM EDITION  [ V4 FULL EXPLOITS OMNI ]"; Title.TextColor3 = Color3.fromRGB(255,255,255); Title.Font = Enum.Font.GothamBold; Title.TextSize = 11; Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+Title.Size = UDim2.new(1, 0, 0, 42); Title.Text = "⚡ Nika Hub CALL EDITION  [ V999 FULL ]"; Title.TextColor3 = Color3.fromRGB(255,255,255); Title.Font = Enum.Font.GothamBold; Title.TextSize = 11; Title.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 local Sidebar = Instance.new("Frame", MainFrame)
 Sidebar.Size = UDim2.new(0, 140, 1, -42); Sidebar.Position = UDim2.new(0, 0, 0, 42); Sidebar.BackgroundColor3 = Color3.fromRGB(14, 14, 18)
 local SideList = Instance.new("UIListLayout", Sidebar); SideList.Padding = UDim.new(0, 4); SideList.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -1712,4 +1712,4 @@ task.spawn(function()
     end
 end)
 
-CustomNotify("INVIS V10 ULTRA FULLY INJECTED!", 4)
+CustomNotify("Nika Hub V999 ULTRA FULLY INJECTED!", 4)
