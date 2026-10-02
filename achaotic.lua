@@ -1,4 +1,3 @@
-
 cloneref = cloneref or function(i) return i end
 cloenfunction = cloenfunction or function(...) return ... end
 hookfunction = hookfunction or function(a, b) return a end
@@ -9,7 +8,7 @@ local SakuraLib = nil
 local window = nil
 local ManualConfig = {
     UISourceURL = "https://raw.githubusercontent.com/SKR-Hub-t/Sakura-ui/refs/heads/main/Sakura.luau",
-    WindowTitle = "nigga ap",
+    WindowTitle = "nika hub x nova",
     RootFolder = "AchaoticUI",
     ConfigFolder = "AchaoticUI/SakuraModified",
     Controls = {},
