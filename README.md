@@ -197,7 +197,7 @@
 <h2 align="center">✍️ Sign My Guestbook</h2>
 
 <p align="center">
-  <a href="https://github.com/Diandrare/Diandrare/issues/new?template=guestbook.yml">
+  <a href="https://nikaa.xo.je">
     <img src="https://img.shields.io/badge/Leave%20a%20message-%F0%9F%92%8C-ff69b4?style=for-the-badge"/>
   </a>
 </p>
