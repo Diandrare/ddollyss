@@ -62,12 +62,6 @@
   <img src="https://skillicons.dev/icons?i=js,ts,py,nodejs,html,css,figma,ps,pr,ae,blender,git,github,vscode,mongodb,mysql&perline=8" />
 </p>
 
-<!-- ═══════════════ SKILL BARS ═══════════════ -->
-<p align="center">
-  <img src="https://github-readme-stats.vercel.app/api/wakatime?username=YOUR_WAKATIME_USERNAME&theme=radical&hide_border=true&layout=compact&langs_count=6" />
-</p>
-
-<br/>
 
 <!-- ═══════════════ DOOMESTIC ═══════════════ -->
 <h2 align="center">🌸 Doomestic</h2>
@@ -158,18 +152,7 @@
 
 <p align="center">
   <a href="https://open.spotify.com/user/31a33ysxajzbfgve6fgmy2w5wfvu?si=6f8ea86f0957461a">
-    <img src="https://spotify-github-profile.kittinanx.com/api/view?uid=31a33ysxajzbfgve6fgmy2w5wfvu&cover_image=true&theme=novatorem&show_offline=false&background_color=121212&interchange=true&bar_color=ff69b4&bar_color_cover=true" />
-  </a>
-</p>
-
-<br/>
-
-<!-- ═══════════════ HOLOPIN ═══════════════ -->
-<h2 align="center">🏆 Holopin Badges</h2>
-
-<p align="center">
-  <a href="https://holopin.io/@diandrare">
-    <img src="diandrare" />
+    <img src="https://spotify-github-profile.kittinanx.com/api/view?uid=31a33ysxajzbfgve6fgmy2w5wfvu&cover_image=true&theme=novatorem&show_offline=false&background_color=121212&interchange=true&bar_color=ff69b4&bar_color_cover=true"/>
   </a>
 </p>
 
