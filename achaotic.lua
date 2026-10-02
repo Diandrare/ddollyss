@@ -1,3 +1,4 @@
+
 cloneref = cloneref or function(i) return i end
 cloenfunction = cloenfunction or function(...) return ... end
 hookfunction = hookfunction or function(a, b) return a end
