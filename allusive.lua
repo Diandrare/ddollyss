@@ -437,8 +437,8 @@ end
 
 __S[7]()
 
-if not isfolder("Nika79xv") then
-    makefolder("Nika79xv")
+if not isfolder("Allusive") then
+    makefolder("Allusive")
 end
 
 local u867 = {}
@@ -446,7 +446,7 @@ u867.__index = u867
 
 function u867.save(r0, u868, u869)
     local function r4()
-        writefile("Nika79xv/" .. u868 .. ".json", u833:JSONEncode(u869))
+        writefile("Allusive/" .. u868 .. ".json", u833:JSONEncode(u869))
     end
 
     local r3, r4_2 = pcall(r4)
@@ -458,12 +458,12 @@ end
 
 function u867.load(u871, u870, u872)
     local function r4()
-        if not isfile("Nika79xv/" .. u870 .. ".json") then
+        if not isfile("Allusive/" .. u870 .. ".json") then
             u871:save(u870, u872)
             return
         end
 
-        local r4 = readfile("Nika79xv/" .. u870 .. ".json")
+        local r4 = readfile("Allusive/" .. u870 .. ".json")
 
         if not r4 then
             u871:save(u870, u872)
@@ -882,7 +882,7 @@ function u864.create_ui(u876)
     r47.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", u824.FontWeight.Bold)
     r47.TextColor3 = u877.Accent
     r47.TextTransparency = 0.05
-    r47.Text = "Nika79xv"
+    r47.Text = "Allusive"
     r47.Name = "ClientName"
     r47.Size = u821.new(0, 68, 0, 14)
     r47.AnchorPoint = Vector2.new(0, 0.5)
@@ -5761,8 +5761,8 @@ local u1070 = {
     },
     custom_win = {
         enabled = false,
-        win_message = "Nika79xv",
-        kill_message = "Nika79xv",
+        win_message = "Allusive",
+        kill_message = "Allusive",
         connections = {}
     },
     immortal = {
@@ -12449,7 +12449,7 @@ if u864._config._flags.custom_win_win_text == nil then
     end
 
     if not __S[3] then
-        __S[3] = "Nika79xv"
+        __S[3] = "Allusive"
     end
 
     __S[5].custom_win_win_text = __S[3]
@@ -12470,7 +12470,7 @@ if u864._config._flags.custom_win_kill_text == nil then
     end
 
     if not __S[3] then
-        __S[3] = "Nika79xv"
+        __S[3] = "Allusive"
     end
 
     __S[5].custom_win_kill_text = __S[3]
