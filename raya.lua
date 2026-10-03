@@ -941,7 +941,7 @@ function Library:create_ui()
     ClientName.Font = Enum.Font.GothamBold
     ClientName.TextColor3 = Color3.fromRGB(255, 255, 255)
     ClientName.TextTransparency = 0
-    ClientName.Text = 'Nika hub'
+    ClientName.Text = 'Raya hub'
     ClientName.Name = 'ClientName'
     ClientName.Size = UDim2.new(0, 31, 0, 13)
     ClientName.AnchorPoint = Vector2.new(0, 0.5)
