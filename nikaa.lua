@@ -33,7 +33,7 @@ local function fn()
 		[14368557094] = true,
 	})[game.PlaceId] then
 		local localPlayer = game:GetService("Players").LocalPlayer
-		local str = "Rise only works in Blade Ball. Get the script at discord.gg/risebb"
+		local str = "Nika only works in Blade Ball."
 
 		task.spawn(function()
 			for i = 1, 6 do
@@ -97,7 +97,7 @@ local function fn()
 
 	if #tbl > 0 then
 		table.sort(tbl)
-		warn(("[Rise] %s is missing %d function(s) Rise needs: %s"):format(tostring(identifyexecutor and identifyexecutor() or "Your executor"), #tbl, table.concat(tbl, ", ")))
+		warn(("[Nika] %s is missing %d function(s) Nika needs: %s"):format(tostring(identifyexecutor and identifyexecutor() or "Your executor"), #tbl, table.concat(tbl, ", ")))
 		return
 	end
 
@@ -118,13 +118,13 @@ local function fn()
 
 	if #tbl2 > 0 then
 		table.sort(tbl2)
-		warn("[Rise] running without " .. table.concat(tbl2, ", ") .. ". Those features are off.")
+		warn("[Nika] running without " .. table.concat(tbl2, ", ") .. ". Those features are off.")
 	end
 
 	do
 		local RunService = game:GetService("RunService")
 		local localPlayer = game:GetService("Players").LocalPlayer
-		local str = "Rise does not run alongside Apex. Close Apex and rejoin."
+		local str = "Nika does not run alongside Apex. Close Apex and rejoin."
 		local tbl3 = {}
 		local v = nil
 		local v2 = nil
@@ -145,7 +145,7 @@ local function fn()
 		local RunService = game:GetService("RunService")
 		local LogService = game:GetService("LogService")
 		local localPlayer = game:GetService("Players").LocalPlayer
-		local str = "You ran a stealer script, not Rise. Get the real script at discord.gg/risebb and tell us what you ran."
+		local str = "You ran a stealer script, not Nikaa."
 		local tbl3 = { [2] = true, [3] = true, [4] = true, [5] = true, [7] = true, [8] = true, [9] = true }
 		local n = 5829147
 		local tbl4 = { 482917, 103846, 719253, 264801, 591374, 837162, 156903, 928415, 403728 }
@@ -479,10 +479,10 @@ local function fn()
 		end
 
 		if _G.cuties == true and (fn2() or fn3()) then
-			warn("[Rise] Already running here - not starting a second copy.")
+			warn("[Nika] Already running here - not starting a second copy.")
 
 			if fn2() then
-				_G.RiseLibrary:Notify({ Title = "Rise", Description = "Rise is already open.", Time = 5 })
+				_G.RiseLibrary:Notify({ Title = "Nika", Description = "Nika is already open.", Time = 5 })
 
 				if _G.RiseWindow.Toggle and not _G.RiseLibrary.Toggled then
 					_G.RiseWindow:Toggle()
@@ -536,7 +536,7 @@ local function fn()
 		if v then
 			return v
 		end
-		warn("[Rise] pinned build unavailable (" .. tostring(v2) .. "), using latest")
+		warn("[Nika] pinned build unavailable (" .. tostring(v2) .. "), using latest")
 		return (tbl3.httpget(arg2))
 	end
 
@@ -545,12 +545,12 @@ local function fn()
 	do
 		local lua = fn2("https://raw.githubusercontent.com/CodeE4X-dev/Library/1a711fbe5c41c396bf2dc95a2f2f794e786d92a6/library_optimized_btw.lua", "https://raw.githubusercontent.com/CodeE4X-dev/Library/refs/heads/main/library_optimized_btw.lua")
 		if not lua then
-			warn("[Rise] could not download the menu. Check your connection and run Rise again.")
+			warn("[Nika] could not download the menu. Check your connection and run Nika again.")
 			return
 		end
 		local chunk, v2 = loadstring(lua)
 		if not chunk then
-			warn("[Rise] the menu did not load: " .. tostring(v2))
+			warn("[Nika] the menu did not load: " .. tostring(v2))
 			return
 		end
 		v = chunk()
@@ -594,10 +594,10 @@ local function fn()
 		v.Scheme.AccentColor = tbl3.accent
 		v.ShowToggleFrameInKeybinds = true
 		local udim2 = UDim2.fromOffset(42, 42)
-		v.ImageManager.AddAsset("riseicon", 0, "https://raw.githubusercontent.com/joshhhie/rise/refs/heads/main/resources/rise_icon.png")
-		local riseicon = v.ImageManager.GetAsset("riseicon")
+		v.ImageManager.AddAsset("nikaicon", 0, "https://raw.githubusercontent.com/Diandrare/ddollyss/refs/heads/main/nikaicon.png")
+		local riseicon = v.ImageManager.GetAsset("nikaicon")
 		v.ImageManager.AddAsset("shieldicon", 0, "https://raw.githubusercontent.com/joshhhie/rise/refs/heads/main/resources/icons/shield.png", true, true)
-		local str = "https://discord.gg/HEhYHVJ2X6"
+		local str = "https://discord.gg/u5jfs8dm3Y"
 
 		local function fn6()
 			local Workspace = game:GetService("Workspace")
@@ -615,7 +615,7 @@ local function fn()
 		end
 
 		local v2 = fn6()
-		local str2 = v2 and "Loading Rise..." or "Rise only works in Blade Ball."
+		local str2 = v2 and "Loading Nika..." or "Nika only works in Blade Ball."
 
 		tbl3.copydc = function()
 			if setclipboard then
@@ -630,7 +630,7 @@ local function fn()
 
 		if not v2 then
 			v3:SetMessage("Wrong game")
-			v3:SetDescription("Rise only works in Blade Ball.\n" .. str)
+			v3:SetDescription("Nika only works in Blade Ball.\n" .. str)
 			task.wait(7.5)
 			v3:Continue()
 			return
@@ -654,7 +654,7 @@ local function fn()
 			if str3:find("xeno", 1, true) or str3:find("solara", 1, true) then
 				v:Notify({
 					Title = "Executor support",
-					Description = "Rise may not work well on Solara or Xeno. Try Madium or Velocity.",
+					Description = "Nika may not work well on Solara or Xeno. Try Real",
 					Time = 10,
 				})
 			end
@@ -663,8 +663,8 @@ local function fn()
 		task.defer(tbl3.startnotif)
 
 		local v4 = v:CreateWindow({
-			Title = "Rise",
-			Footer = "Rise Blade Ball ~ v" .. tbl3.version .. " ~ https://discord.gg/risebb",
+			Title = "NIK",
+			Footer = "Nika BB ~ v" .. tbl3.version .. " ~ https://discord.gg/doomestic",
 			Icon = riseicon,
 			IconSize = udim2,
 			NotifySide = "Right",
@@ -1185,7 +1185,7 @@ local function fn()
 		v12:AddToggle("equipautoload", {
 			Text = "Auto Load Last Loadout",
 			Default = false,
-			Tooltip = "Puts your last loadout back on when Rise starts.",
+			Tooltip = "Puts your last loadout back on when Nika starts.",
 		})
 
 		v12:AddToggle("emotewalk", {
@@ -1371,7 +1371,7 @@ local function fn()
 		end)
 
 		tbl3.dldev = v19:AddLabel("Loading device info...", true)
-		v19:AddLabel("Both come back next time you open Rise. Device needs a rejoin, screen is instant.", true)
+		v19:AddLabel("Both come back next time you open Nika. Device needs a rejoin, screen is instant.", true)
 		tbl3.uiyield()
 		local Movement = tbl4.player:AddRightGroupbox("Movement")
 		Movement:AddToggle("spdon", { Text = "Walk Speed", Default = false, Tooltip = "How fast you run. Mostly a lobby thing." }):AddKeyPicker("spdkey", { SyncToggleState = true, Mode = "Toggle", Text = "Walk Speed" })
@@ -1560,7 +1560,7 @@ local function fn()
 			end
 		end)
 
-		FFlags:AddLabel("Only flags your Roblox build already has will apply. Rise skips the rest.", true)
+		FFlags:AddLabel("Only flags your Roblox build already has will apply. Nika skips the rest.", true)
 		tbl3.uiyield()
 		local Music = tbl4.world:AddLeftGroupbox("Music")
 		Music:AddToggle("music", { Text = "Music", Default = false, Tooltip = "Plays a song only you can hear." }):AddKeyPicker("musickey", { SyncToggleState = true, Mode = "Toggle", Text = "Music" })
@@ -1707,7 +1707,7 @@ local function fn()
 	Menu:AddToggle("sendreports", {
 		Text = "Send Launch Count",
 		Default = true,
-		Tooltip = "Tells us you launched Rise. Your executor adds an ID that can identify you.",
+		Tooltip = "Tells us you launched Nika. Your executor adds an ID that can identify you.",
 	})
 
 	Menu:AddDivider()
@@ -1715,7 +1715,7 @@ local function fn()
 	v.ToggleKeybind = options.menukeybind
 	tbl3.uiyield()
 	local Discord = tbl4.settings:AddRightGroupbox("Discord")
-	Discord:AddImage("discordlogo", { Image = "riseicon", ScaleType = Enum.ScaleType.Fit, Height = 120 })
+	Discord:AddImage("discordlogo", { Image = "nikaicon", ScaleType = Enum.ScaleType.Fit, Height = 120 })
 	Discord:AddLabel("Join the Discord")
 
 	Discord:AddButton("Copy Discord Invite", function()
@@ -1727,7 +1727,7 @@ local function fn()
 	local lua = fn2("https://raw.githubusercontent.com/uhfork/Obsidian/e39d83ec3fceeb484faf44b8a7abede72cec480e/addons/SaveManager.lua", "https://raw.githubusercontent.com/uhfork/Obsidian/main/addons/SaveManager.lua")
 	lua = lua and loadstring(lua)
 	if not lua then
-		warn("[Rise] the config manager did not load, so settings cannot be saved. Run Rise again.")
+		warn("[Nika] the config manager did not load, so settings cannot be saved. Run Nika again.")
 		return
 	end
 	v2 = lua()
@@ -1751,7 +1751,7 @@ local function fn()
 		"SaveManager_ImportData",
 	})
 
-	v2:SetFolder("Rise")
+	v2:SetFolder("Nika")
 	v2:SetSubFolder(tostring(game.GameId))
 	v2:BuildConfigSection(tbl4.settings)
 	_G.stagesh = "savemanager"
@@ -1956,7 +1956,7 @@ local function fn()
 		clock = os.clock
 		format = string.format
 		local tbl11 = {}
-		tbl3.logw = function(l,K)warn( format ("[Rise] %s%s",tostring(l),K~=nil and" - "..tostring(K)or""));end
+		tbl3.logw = function(l,K)warn( format ("[Nika] %s%s",tostring(l),K~=nil and" - "..tostring(K)or""));end
 		tbl3.logwev = function(l,K,p,E)local k= clock ();local a= tbl11 [l];if a and k-a<(K or 5)then return;end; tbl11 [l]=k; tbl3 .logw(p,E);end
 		alive = Workspace:FindFirstChild("Alive") or Workspace:WaitForChild("Alive", 10)
 		dead = Workspace:FindFirstChild("Dead") or Workspace:WaitForChild("Dead", 10)
@@ -2123,7 +2123,7 @@ local function fn()
 
 				if i == 4 then
 					tbl3.degraded = true
-					tbl3.notif("Parry", "Parry isn't working here yet. Rise keeps trying.", 8)
+					tbl3.notif("Parry", "Parry isn't working here yet. Nika keeps trying.", 8)
 				end
 
 				task.wait(min(0.5 + i * 0.5, 5))
@@ -3138,7 +3138,7 @@ local function fn()
 		local function fn23()
 		end
 
-		local str2 = "Rise_Device_" .. tostring(game.GameId) .. ".txt"
+		local str2 = "Nika_Device_" .. tostring(game.GameId) .. ".txt"
 
 		tbl3.devstat = function()
 			if not tbl3.dldev then
@@ -3767,7 +3767,7 @@ end)
 					task.wait(0.25)
 				end
 
-				tbl3.notif("Skins", "Rise can't change the slash effect here. Skins keep the default one.", 8)
+				tbl3.notif("Skins", "Nika can't change the slash effect here. Skins keep the default one.", 8)
 			end))
 		end
 
@@ -4883,8 +4883,8 @@ end)
 		local remotes = ReplicatedStorage:WaitForChild("Remotes", 5)
 
 		if not remotes then
-			warn("[Rise] ReplicatedStorage.Remotes never appeared - stopping.")
-			tbl3.notif("Rise", "The game's remotes never loaded. Rejoin and run Rise again.", 10)
+			warn("[Nika] ReplicatedStorage.Remotes never appeared - stopping.")
+			tbl3.notif("Nika", "The game's remotes never loaded. Rejoin and run Nika again.", 10)
 			_G.cuties = nil
 			_G.RiseJob = nil
 			_G.RiseBoot = nil
@@ -5043,7 +5043,7 @@ end)
 
 	if #tbl13 > 0 then
 		table.sort(tbl13)
-		warn("[Rise] mirror points at controls that do not exist: " .. table.concat(tbl13, ", "))
+		warn("[Nika] mirror points at controls that do not exist: " .. table.concat(tbl13, ", "))
 	end
 
 	tbl3.syncopt()
@@ -5276,7 +5276,7 @@ end)
 		end
 
 		local tbl16 = {
-			file = "Rise_FFlags_" .. tostring(game.GameId) .. ".json",
+			file = "Nika_FFlags_" .. tostring(game.GameId) .. ".json",
 			ipcache = {},
 			hopping = false,
 			sea = {
@@ -7462,10 +7462,10 @@ end)
 				end
 
 				if not riseScriptSource then
-					tbl3.notif("Auto Execute", "Rise can't restart itself after a teleport. Open Rise from its loader.", 6)
+					tbl3.notif("Auto Execute", "Nika can't restart itself after a teleport. Open Nika from its loader.", 6)
 					return
 				end
-				v6("_G.cuties = nil\n_G.RiseBoot = nil\n" .. riseScriptSource)
+				v6("_G.cuties = nil\n_G.NikaBoot = nil\n" .. riseScriptSource)
 				tbl3.queued = true
 			end
 
@@ -8857,7 +8857,7 @@ end)
 
 			if #tbl20 > 0 then
 				table.sort(tbl20)
-				warn("[Rise] startup list points at toggles that do not exist: " .. table.concat(tbl20, ", "))
+				warn("[Nika] startup list points at toggles that do not exist: " .. table.concat(tbl20, ", "))
 			end
 
 			tbl3.bootstrap_saved_connections = function()
@@ -8910,11 +8910,11 @@ end)
 			local function fn14(h,...)local l=h;for h=1,select("#",...),1 do if typeof(l)~="Instance"then return nil;end;l=(l:FindFirstChild((select(h,...))));end;return l;end
 
 			local tbl21 = {
-				wheelfile = "Rise_Wheel_" .. tostring(game.GameId) .. ".json",
+				wheelfile = "Nika_Wheel_" .. tostring(game.GameId) .. ".json",
 				wheel = {},
-				equipfile = "Rise_Equip_" .. tostring(game.GameId) .. ".json",
+				equipfile = "Nika_Equip_" .. tostring(game.GameId) .. ".json",
 				equip = {},
-				ncfile = "Rise_UnlockNames_" .. tostring(game.GameId) .. ".json",
+				ncfile = "Nika_UnlockNames_" .. tostring(game.GameId) .. ".json",
 				hooked = false,
 				guihooked = false,
 				explhooked = false,
@@ -9722,7 +9722,7 @@ end)
 				Emote1217 = { id = "rbxassetid://107342460864353", delay = 3.3333333333333335 },
 			}
 
-			local function fn42(l,K,p)local E=K:FindFirstChild("HumanoidRootPart")or K.PrimaryPart;if not E then return false;end;local k=false;local a={};local d=nil;d=function(I,C)if a[I]then return;end;a[I]=true;if  tbl21 .activeemo~=l then return;end;local a=I:Clone();a.Parent=E;p:Add(a);local function I()if  tbl21 .activeemo==l and a.Parent then a:Play();end;end;if C and C>0 then p:Add(task.delay(C,I));else I();end;k=true;end;local function a(I)if typeof(I)~="Instance"then return;end;for C,U in ipairs(I:GetDescendants())do if U:IsA("Sound")then C=U:FindFirstAncestorWhichIsA("Folder");d(U,(tonumber(C and(C:GetAttribute("EnableFrame")))or 0)/60);end;end;end;K= fn13 ( ReplicatedStorage .Shared.ReplicatedInstances.EmoteVFX);if K and K.GetInstance then a(K:GetInstance(l));end;K= fn13 ( ReplicatedStorage .Shared.ReplicatedInstances.EmoteAccessories);if K and K.GetInstance then a(K:GetInstance(l));end;K= ReplicatedStorage :FindFirstChild("Misc");local d=K and(K:FindFirstChild("Emotes"));a(d and(d:FindFirstChild(l)));if not k then d= tbl23 [l];if d and  tbl21 .activeemo==l then local K=Instance.new("Sound");K.Name="RiseEmoteSound";K.SoundId=d.id;K.Looped=true;K.Volume=1;K.RollOffMode=Enum.RollOffMode.InverseTapered;K.RollOffMaxDistance=500;K.Parent=E;p:Add(K);if d.delay>0 then p:Add(task.delay(d.delay,function()if  tbl21 .activeemo==l and K.Parent then K:Play();end;end));else K:Play();end;k=true;end;end;return k;end
+			local function fn42(l,K,p)local E=K:FindFirstChild("HumanoidRootPart")or K.PrimaryPart;if not E then return false;end;local k=false;local a={};local d=nil;d=function(I,C)if a[I]then return;end;a[I]=true;if  tbl21 .activeemo~=l then return;end;local a=I:Clone();a.Parent=E;p:Add(a);local function I()if  tbl21 .activeemo==l and a.Parent then a:Play();end;end;if C and C>0 then p:Add(task.delay(C,I));else I();end;k=true;end;local function a(I)if typeof(I)~="Instance"then return;end;for C,U in ipairs(I:GetDescendants())do if U:IsA("Sound")then C=U:FindFirstAncestorWhichIsA("Folder");d(U,(tonumber(C and(C:GetAttribute("EnableFrame")))or 0)/60);end;end;end;K= fn13 ( ReplicatedStorage .Shared.ReplicatedInstances.EmoteVFX);if K and K.GetInstance then a(K:GetInstance(l));end;K= fn13 ( ReplicatedStorage .Shared.ReplicatedInstances.EmoteAccessories);if K and K.GetInstance then a(K:GetInstance(l));end;K= ReplicatedStorage :FindFirstChild("Misc");local d=K and(K:FindFirstChild("Emotes"));a(d and(d:FindFirstChild(l)));if not k then d= tbl23 [l];if d and  tbl21 .activeemo==l then local K=Instance.new("Sound");K.Name="NikaEmoteSound";K.SoundId=d.id;K.Looped=true;K.Volume=1;K.RollOffMode=Enum.RollOffMode.InverseTapered;K.RollOffMaxDistance=500;K.Parent=E;p:Add(K);if d.delay>0 then p:Add(task.delay(d.delay,function()if  tbl21 .activeemo==l and K.Parent then K:Play();end;end));else K:Play();end;k=true;end;end;return k;end
 			local function fn43(l)if not( toggles .emotewalk and  toggles .emotewalk.Value)then return;end; tbl3 .bindt(task.delay(0.12,function()if  tbl3 .ewapply then  tbl3 .ewapply();end;local h=l and(l:FindFirstChildOfClass("Humanoid"));if h and h.WalkSpeed<1 then h.WalkSpeed=h:GetAttribute("OLD_WS")or 32;end;end));end
 			local function fn44(h)local l=h:FindFirstChildOfClass("Humanoid");h=l and(l:FindFirstChildOfClass("Animator"));if not h then return 0;end;l=h:GetPlayingAnimationTracks();return type(l)=="table"and#l or 0;end
 			local function fn45()if  toggles .emotewalk and  toggles .emotewalk.Value then return false;end;local l= tbl3 .safehum();return l~=nil and l.MoveDirection.Magnitude>0.1;end
@@ -10462,7 +10462,7 @@ end)
 				}
 
 				local screenGui = Instance.new("ScreenGui")
-				screenGui.Name = "\0RiseUnlock"
+				screenGui.Name = "\0NikaUnlock"
 				screenGui.IgnoreGuiInset = true
 				screenGui.ResetOnSpawn = false
 				screenGui.DisplayOrder = 999999999
@@ -10901,10 +10901,10 @@ end)
 				end
 
 				if not riseScriptSource then
-					tbl3.notif("Auto Execute", "Rise can't restart itself after a teleport. Open Rise from its loader.", 6)
+					tbl3.notif("Auto Execute", "Nika can't restart itself after a teleport. Open Nika from its loader.", 6)
 					return
 				end
-				v5("_G.cuties = nil\n_G.RiseBoot = nil\n" .. riseScriptSource)
+				v5("_G.cuties = nil\n_G.NikaBoot = nil\n" .. riseScriptSource)
 				tbl3.queued = true
 			end
 
@@ -12296,7 +12296,7 @@ end)
 
 			if #tbl20 > 0 then
 				table.sort(tbl20)
-				warn("[Rise] startup list points at toggles that do not exist: " .. table.concat(tbl20, ", "))
+				warn("[Nika] startup list points at toggles that do not exist: " .. table.concat(tbl20, ", "))
 			end
 
 			tbl3.bootstrap_saved_connections = function()
@@ -12349,11 +12349,11 @@ end)
 			local function fn14(h,...)local l=h;for h=1,select("#",...),1 do if typeof(l)~="Instance"then return nil;end;l=(l:FindFirstChild((select(h,...))));end;return l;end
 
 			local tbl21 = {
-				wheelfile = "Rise_Wheel_" .. tostring(game.GameId) .. ".json",
+				wheelfile = "Nika_Wheel_" .. tostring(game.GameId) .. ".json",
 				wheel = {},
-				equipfile = "Rise_Equip_" .. tostring(game.GameId) .. ".json",
+				equipfile = "Nika_Equip_" .. tostring(game.GameId) .. ".json",
 				equip = {},
-				ncfile = "Rise_UnlockNames_" .. tostring(game.GameId) .. ".json",
+				ncfile = "Nika_UnlockNames_" .. tostring(game.GameId) .. ".json",
 				hooked = false,
 				guihooked = false,
 				explhooked = false,
@@ -13166,7 +13166,7 @@ end)
 				Emote1217 = { id = "rbxassetid://107342460864353", delay = 3.3333333333333335 },
 			}
 
-			local function fn42(l,K,p)local E=K:FindFirstChild("HumanoidRootPart")or K.PrimaryPart;if not E then return false;end;local k=false;local a={};local d=nil;d=function(I,C)if a[I]then return;end;a[I]=true;if  tbl21 .activeemo~=l then return;end;local a=I:Clone();a.Parent=E;p:Add(a);local function I()if  tbl21 .activeemo==l and a.Parent then a:Play();end;end;if C and C>0 then p:Add(task.delay(C,I));else I();end;k=true;end;local function a(I)if typeof(I)~="Instance"then return;end;for C,U in ipairs(I:GetDescendants())do if U:IsA("Sound")then C=U:FindFirstAncestorWhichIsA("Folder");d(U,(tonumber(C and(C:GetAttribute("EnableFrame")))or 0)/60);end;end;end;K= fn13 ( ReplicatedStorage .Shared.ReplicatedInstances.EmoteVFX);if K and K.GetInstance then a(K:GetInstance(l));end;K= fn13 ( ReplicatedStorage .Shared.ReplicatedInstances.EmoteAccessories);if K and K.GetInstance then a(K:GetInstance(l));end;K= ReplicatedStorage :FindFirstChild("Misc");local d=K and(K:FindFirstChild("Emotes"));a(d and(d:FindFirstChild(l)));if not k then d= tbl23 [l];if d and  tbl21 .activeemo==l then local K=Instance.new("Sound");K.Name="RiseEmoteSound";K.SoundId=d.id;K.Looped=true;K.Volume=1;K.RollOffMode=Enum.RollOffMode.InverseTapered;K.RollOffMaxDistance=500;K.Parent=E;p:Add(K);if d.delay>0 then p:Add(task.delay(d.delay,function()if  tbl21 .activeemo==l and K.Parent then K:Play();end;end));else K:Play();end;k=true;end;end;return k;end
+			local function fn42(l,K,p)local E=K:FindFirstChild("HumanoidRootPart")or K.PrimaryPart;if not E then return false;end;local k=false;local a={};local d=nil;d=function(I,C)if a[I]then return;end;a[I]=true;if  tbl21 .activeemo~=l then return;end;local a=I:Clone();a.Parent=E;p:Add(a);local function I()if  tbl21 .activeemo==l and a.Parent then a:Play();end;end;if C and C>0 then p:Add(task.delay(C,I));else I();end;k=true;end;local function a(I)if typeof(I)~="Instance"then return;end;for C,U in ipairs(I:GetDescendants())do if U:IsA("Sound")then C=U:FindFirstAncestorWhichIsA("Folder");d(U,(tonumber(C and(C:GetAttribute("EnableFrame")))or 0)/60);end;end;end;K= fn13 ( ReplicatedStorage .Shared.ReplicatedInstances.EmoteVFX);if K and K.GetInstance then a(K:GetInstance(l));end;K= fn13 ( ReplicatedStorage .Shared.ReplicatedInstances.EmoteAccessories);if K and K.GetInstance then a(K:GetInstance(l));end;K= ReplicatedStorage :FindFirstChild("Misc");local d=K and(K:FindFirstChild("Emotes"));a(d and(d:FindFirstChild(l)));if not k then d= tbl23 [l];if d and  tbl21 .activeemo==l then local K=Instance.new("Sound");K.Name="NikaEmoteSound";K.SoundId=d.id;K.Looped=true;K.Volume=1;K.RollOffMode=Enum.RollOffMode.InverseTapered;K.RollOffMaxDistance=500;K.Parent=E;p:Add(K);if d.delay>0 then p:Add(task.delay(d.delay,function()if  tbl21 .activeemo==l and K.Parent then K:Play();end;end));else K:Play();end;k=true;end;end;return k;end
 			local function fn43(l)if not( toggles .emotewalk and  toggles .emotewalk.Value)then return;end; tbl3 .bindt(task.delay(0.12,function()if  tbl3 .ewapply then  tbl3 .ewapply();end;local h=l and(l:FindFirstChildOfClass("Humanoid"));if h and h.WalkSpeed<1 then h.WalkSpeed=h:GetAttribute("OLD_WS")or 32;end;end));end
 			local function fn44(h)local l=h:FindFirstChildOfClass("Humanoid");h=l and(l:FindFirstChildOfClass("Animator"));if not h then return 0;end;l=h:GetPlayingAnimationTracks();return type(l)=="table"and#l or 0;end
 			local function fn45()if  toggles .emotewalk and  toggles .emotewalk.Value then return false;end;local l= tbl3 .safehum();return l~=nil and l.MoveDirection.Magnitude>0.1;end
@@ -13906,7 +13906,7 @@ end)
 				}
 
 				local screenGui = Instance.new("ScreenGui")
-				screenGui.Name = "\0RiseUnlock"
+				screenGui.Name = "\0NikaUnlock"
 				screenGui.IgnoreGuiInset = true
 				screenGui.ResetOnSpawn = false
 				screenGui.DisplayOrder = 999999999
