@@ -941,7 +941,7 @@ function Library:create_ui()
     ClientName.Font = Enum.Font.GothamBold
     ClientName.TextColor3 = Color3.fromRGB(255, 255, 255)
     ClientName.TextTransparency = 0
-    ClientName.Text = 'Raya hub'
+    ClientName.Text = 'Nika hub'
     ClientName.Name = 'ClientName'
     ClientName.Size = UDim2.new(0, 31, 0, 13)
     ClientName.AnchorPoint = Vector2.new(0, 0.5)
@@ -12275,7 +12275,7 @@ local System = {
         __slashesoffury_count = 0,
         __humanizer_enabled = false,
         __humanizer_min_accuracy = 1,
-        __humanizer_max_accuracy = 50,
+        __humanizer_max_accuracy = 100,
         __humanizer_last_update = 0,
         __humanizer_next_change = 0.8,
         __is_mobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled,
@@ -12360,8 +12360,8 @@ local function update_randomized_accuracy()
     local ping_str = Stats.Network.ServerStatsItem["Data Ping"]:GetValueString()
     local ping = tonumber(ping_str:match("%d+")) or 0
 
-    local min_humanizer = math.clamp(props.__humanizer_min_accuracy, 1, 50)
-    local max_humanizer = math.clamp(props.__humanizer_max_accuracy, 1, 50)
+    local min_humanizer = math.clamp(props.__humanizer_min_accuracy, 1, 100)
+    local max_humanizer = math.clamp(props.__humanizer_max_accuracy, 1, 100)
     if min_humanizer > max_humanizer then
         min_humanizer, max_humanizer = max_humanizer, min_humanizer
     end
@@ -13982,9 +13982,9 @@ curve_selector_module = AutoparryTab:create_module({
 autoparry_module:create_slider({
     title = "Parry Accuracy",
     flag = "ParryAccuracy",
-    maximum_value = 50,
+    maximum_value = 100,
     minimum_value = 1,
-    value = 50,
+    value = 100,
     round_number = true,
     callback = function(value)
         if System and not System.__properties.__humanizer_enabled then
@@ -14010,9 +14010,9 @@ local humanizer_module = AutoparryTab:create_module({
 humanizer_module:create_range_slider({
     title = "Humanizer Accuracy",
     flag = "HumanizerAccuracyRange",
-    maximum_value = 50,
+    maximum_value = 100,
     minimum_value = 1,
-    value = {min = 1, max = 50},
+    value = {min = 1, max = 100},
     round_number = true,
     callback = function(min_value, max_value)
         if System then
