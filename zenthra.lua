@@ -1,4 +1,3 @@
-
 -- Luraph runtime function (from the VM object, not part of the script: not lifted).
 -- LPH_ENCFUNC decrypts a function this way: (key, encrypted buffer, ...) -> function.
 local function luraph_runtime1(...)
