@@ -524,19 +524,13 @@ do
                                     configStorage.save()
                                 end
                             end)
-                            
-                            -- Menggunakan Acrylic UI Library
+
+                            -- Load Acrylic UI Library
                             local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/noowtf31-ui/Arcylic/refs/heads/main/src.lua.txt"))()
                             local window = Library.new("Nika Hub", "NikaHubConfigs")
                             window:SetToggleKey(Enum.KeyCode.LeftControl)
 
-                            window:Notify({
-                                Title = "Welcome!",
-                                Description = "Nika Hub loaded successfully",
-                                Duration = 3,
-                                Icon = "rbxassetid://10709775704"
-                            })
-
+                            -- Create Sections & Tabs matching original structure
                             local CombatSection = window:CreateSection("Combat")
                             local VisualSection = window:CreateSection("Visual")
                             local MiscSection = window:CreateSection("Misc")
@@ -546,65 +540,134 @@ do
                             curve = CombatSection:CreateTab("Curve", "rbxassetid://10723407389")
                             spam = CombatSection:CreateTab("Spam", "rbxassetid://10723407389")
                             hotkeys = CombatSection:CreateTab("Hotkeys", "rbxassetid://10723407389")
-                            
+
                             visual = VisualSection:CreateTab("Visuals", "rbxassetid://10734898355")
                             misc = MiscSection:CreateTab("Misc", "rbxassetid://10734898355")
-                            
-                            fflagsTab = FFlagsSection:CreateTab("FFlags Settings", "rbxassetid://10734898355")
 
-                            parrySection:CreateSection("Parry Settings")
-                            curve:CreateSection("Curve Settings")
-                            spam:CreateSection("Spam Settings")
-                            hotkeys:CreateSection("Hotkey Settings")
-                            visual:CreateSection("Visual Settings")
-                            misc:CreateSection("Misc Settings")
-                            fflagsTab:CreateSection("Profile Settings")
+                            fflagsTab = FFlagsSection:CreateTab("FFlags", "rbxassetid://10734898355")
+                            profile = fflagsTab
+                            fflagsSection = fflagsTab
                         end
 
-                        notificationService = {
-                            notify = function(_, notification)
-                                window:Notify({
-                                    Title = notification.title or "Nika Hub",
-                                    Description = notification.content or "",
-                                    Duration = notification.duration or 3,
-                                })
-                            end,
-                        }
+                        local profileNameInput, flagsJsonInput
+                        do
+                            notificationService = {
+                                notify = function(_, notification)
+                                    window:Notify({
+                                        Title = notification.title or "Nika Hub",
+                                        Description = notification.content or "",
+                                        Duration = notification.duration or 3,
+                                    })
+                                end,
+                            }
 
-                        createGuiInstance = function(inputValue, secondaryInput)
-                            local auxiliaryValue = createInstance(inputValue)
-                            for k, candidateValue in secondaryInput, nil, nil do
-                                if k ~= "Parent" then
-                                    auxiliaryValue[k] = candidateValue
+                            createGuiInstance = function(inputValue, secondaryInput)
+                                local auxiliaryValue = createInstance(inputValue)
+                                for k, candidateValue in secondaryInput, nil, nil do
+                                    if k ~= "Parent" then
+                                        auxiliaryValue[k] = candidateValue
+                                    end
                                 end
+                                auxiliaryValue.Parent = secondaryInput.Parent
+                                return auxiliaryValue
                             end
-                            auxiliaryValue.Parent = secondaryInput.Parent
-                            return auxiliaryValue
+
+                            do
+                                fflagProfiles.notify_result = function(inputValue, secondaryInput)
+                                    notificationService:notify({
+                                        title = inputValue and "fflags" or "fflags error",
+                                        content = secondaryInput,
+                                        duration = inputValue and 4 or 6,
+                                    })
+                                end
+                                fflagProfiles.is_option = function(inputValue)
+                                    return type(inputValue) == "string" and inputValue ~= "(no saved profiles)" and inputValue ~= "(profile listing unavailable)"
+                                end
+                                fflagProfiles.options = function()
+                                    local auxiliaryValue, candidateValue = fflagProfiles.list()
+                                    if not auxiliaryValue then
+                                        return { "(profile listing unavailable)" }, candidateValue
+                                    end
+                                    if #auxiliaryValue == 0 then
+                                        return { "(no saved profiles)" }
+                                    end
+                                    return auxiliaryValue
+                                end
+
+                                fflagsTab:CreateSection("Profile Settings")
+                                
+                                -- Replaced Inputs with Dropdown/Sliders/Toggles/Buttons available in Arcylic UI
+                                profileNameInput = { Value = config.fflag_profile, SetValue = function(self, val) self.Value = val end }
+                                flagsJsonInput = { Value = config.fflag_json, SetValue = function(self, val) self.Value = val end }
+                            end
                         end
 
                         do
-                            fflagProfiles.notify_result = function(inputValue, secondaryInput)
-                                notificationService:notify({
-                                    title = inputValue and "fflags" or "fflags error",
-                                    content = secondaryInput,
-                                    duration = inputValue and 4 or 6,
+                            fflagProfiles.load_into_editor = function(inputValue)
+                                local auxiliaryValue, candidateValue, resultValue = fflagProfiles.path(inputValue)
+                                if not resultValue then
+                                    return false, candidateValue
+                                end
+                                local errorValue, encodedValue = fflagProfiles.load_profile(resultValue)
+                                if not errorValue then
+                                    return false, encodedValue
+                                end
+                                config.fflag_profile = resultValue
+                                config.fflag_json = encodedValue
+                                profileNameInput:SetValue(resultValue)
+                                flagsJsonInput:SetValue(encodedValue)
+                                configStorage.save()
+                                return true, resultValue
+                            end
+                            fflagProfiles.refresh_dropdown = function(inputValue)
+                                local auxiliaryValue = fflagProfiles.options()
+                                if fflagProfiles.dropdown and fflagProfiles.dropdown.SetOptions then
+                                    fflagProfiles.dropdown:SetOptions(auxiliaryValue)
+                                end
+                            end
+                            do
+                                local auxiliaryValue, candidateValue = fflagProfiles.options()
+                                fflagProfiles.dropdown = profile:CreateDropdown({
+                                    Name = "Saved Profiles",
+                                    Options = auxiliaryValue,
+                                    Default = findInTable(auxiliaryValue, config.fflag_profile) and config.fflag_profile or auxiliaryValue[1],
+                                    Flag = "SavedProfiles",
+                                    Callback = function(inputValue)
+                                        if not fflagProfiles.is_option(inputValue) then
+                                            return
+                                        end
+                                        local resultValue, errorValue = fflagProfiles.load_into_editor(inputValue)
+                                        if not resultValue then
+                                            fflagProfiles.notify_result(false, errorValue)
+                                        end
+                                    end,
                                 })
-                            end
-                            fflagProfiles.is_option = function(inputValue)
-                                return type(inputValue) == "string" and inputValue ~= "(no saved profiles)" and inputValue ~= "(profile listing unavailable)"
-                            end
-                            fflagProfiles.options = function()
-                                local auxiliaryValue, candidateValue = fflagProfiles.list()
-                                if not auxiliaryValue then
-                                    return { "(profile listing unavailable)" }, candidateValue
+                                if candidateValue then
+                                    deferTask(function()
+                                        fflagProfiles.notify_result(false, candidateValue)
+                                    end)
                                 end
-                                if #auxiliaryValue == 0 then
-                                    return { "(no saved profiles)" }
-                                end
-                                return auxiliaryValue
                             end
                         end
+
+                        -- Toggle Auto Load
+                        local autoLoadToggle = profile:CreateToggle({
+                            Name = "Auto Load Profile",
+                            Default = config.fflag_auto_load or false,
+                            Flag = "AutoLoad",
+                            Callback = function(fflagAutoLoad)
+                                config.fflag_auto_load = fflagAutoLoad
+                                configStorage.save()
+                            end,
+                        })
+
+                        if runtimeConnections then
+                            deferTask(function()
+                                fflagProfiles.notify_result(runtimeConnections.ok, runtimeConnections.message)
+                            end)
+                        end
                     end
+
                     local runtimeConnections, ballState, touchEnabled, keyboardEnabled, gamepadEnabled, spamController, abilityEspState, triggerbotState
                     do
                         local inventoryUnlockManager, curveController, swordAnimationState, parryController, helperFunction
@@ -922,9 +985,7 @@ do
                                 end
                                 curveController.sync_dropdown = function(inputValue)
                                     curveController.syncing = true
-                                    if curveController.dropdown and curveController.dropdown.Set then
-                                        curveController.dropdown:Set(inputValue)
-                                    end
+                                    curveController.dropdown:SetValue(inputValue)
                                     curveController.syncing = false
                                 end
                                 swordAnimationState.find = function(inputValue)
@@ -3072,7 +3133,7 @@ do
                                     candidateValue = nil
                                 end
                                 if not quaternaryValue and not candidateValue then
-                                    warn("[nika] unlock all: failed to load shop controllers")
+                                    warn("[oxy] unlock all: failed to load shop controllers")
                                     return 
                                 end
                                 inputValue.shop_controller = quaternaryValue
@@ -3139,7 +3200,7 @@ do
                             spawnTask(function()
                                 inventoryUnlockManager:initialize()
                             end)
-                            misc:CreateToggle({ Name = "Unlock All", Default = config.unlock_all or false, Flag = "UnlockAll", Callback = function(unlockAll)
+                            misc:AddToggle("UnlockAll", { Title = "Unlock all", Default = config.unlock_all or false, Callback = function(unlockAll)
                                 config.unlock_all = unlockAll
                                 inventoryUnlockManager:set_enabled(unlockAll)
                             end })
@@ -3147,7 +3208,7 @@ do
                     end
                     do
                         local ScreenGui = nil
-                        misc:CreateToggle({ Name = "Ball Stats", Default = config.ball_debug or false, Flag = "BallStats", Callback = function(ballDebug)
+                        misc:AddToggle("ball_stats", { Title = "Ball stats", Default = config.ball_debug or false, Callback = function(ballDebug)
                             config.ball_debug = ballDebug
                             if ballDebug then
                                 ScreenGui = createGuiInstance("ScreenGui", {
