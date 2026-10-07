@@ -13,84 +13,84 @@ do
                                 do
                                     local secondaryValue
                                     do
-                                        if _G.oxyFluent then
+                                        if _G.nikaFluent then
                                             return 
                                         end
-                                        _G.oxyFluent = true
+                                        _G.nikaFluent = true
                                         cloneref = cloneref or function(inputValue)
                                             return inputValue
                                         end
                                         do
                                             local cloneReference = cloneref
-                                            createInstance = Instance.new
-                                            createTweenInfo = TweenInfo.new
-                                            createUDim = UDim.new
-                                            createUDim2 = UDim2.new
-                                            fromOffset = UDim2.fromOffset
-                                            createVector2 = Vector2.new
-                                            createVector3 = Vector3.new
-                                            createCFrame = CFrame.new
-                                            colorFromRGB = Color3.fromRGB
-                                            formatString = string.format
-                                            clampValue = math.clamp
-                                            floorValue = math.floor
-                                            maxValue = math.max
-                                            minValue = math.min
-                                            arcSin = math.asin
-                                            toRadians = math.rad
-                                            randomValue = math.random
-                                            bitwiseXor = bit32.bxor
-                                            clearTable = table.clear
-                                            concatTable = table.concat
-                                            createTable = table.create
-                                            findInTable = table.find
-                                            insertIntoTable = table.insert
-                                            stringByte = string.byte
-                                            stringChar = string.char
-                                            spawnTask = task.spawn
-                                            delayTask = task.delay
-                                            deferTask = task.defer
-                                            waitTask = task.wait
-                                            globalEnvironment = getgenv()
-                                            ReplicatedStorage = cloneReference(game:GetService("ReplicatedStorage"))
-                                            UserInputService = cloneReference(game:GetService("UserInputService"))
-                                            httpService = cloneReference(game:GetService("HttpService"))
+createInstance = Instance.new
+createTweenInfo = TweenInfo.new
+createUDim = UDim.new
+createUDim2 = UDim2.new
+fromOffset = UDim2.fromOffset
+createVector2 = Vector2.new
+createVector3 = Vector3.new
+createCFrame = CFrame.new
+colorFromRGB = Color3.fromRGB
+formatString = string.format
+clampValue = math.clamp
+floorValue = math.floor
+maxValue = math.max
+minValue = math.min
+arcSin = math.asin
+toRadians = math.rad
+randomValue = math.random
+bitwiseXor = bit32.bxor
+clearTable = table.clear
+concatTable = table.concat
+createTable = table.create
+findInTable = table.find
+insertIntoTable = table.insert
+stringByte = string.byte
+stringChar = string.char
+spawnTask = task.spawn
+delayTask = task.delay
+deferTask = task.defer
+waitTask = task.wait
+globalEnvironment = getgenv()
+ReplicatedStorage = cloneReference(game:GetService("ReplicatedStorage"))
+UserInputService = cloneReference(game:GetService("UserInputService"))
+httpService = cloneReference(game:GetService("HttpService"))
                                             local runService = cloneReference(game:GetService("RunService"))
-                                            TweenService = cloneReference(game:GetService("TweenService"))
-                                            Players = cloneReference(game:GetService("Players"))
-                                            Debris = cloneReference(game:GetService("Debris"))
+TweenService = cloneReference(game:GetService("TweenService"))
+Players = cloneReference(game:GetService("Players"))
+Debris = cloneReference(game:GetService("Debris"))
                                             local statsService = cloneReference(game:GetService("Stats"))
-                                            Workspace = cloneReference(game:GetService("Workspace"))
-                                            createTween = TweenService.Create
+Workspace = cloneReference(game:GetService("Workspace"))
+createTween = TweenService.Create
                                             repeat
-                                                waitTask()
+waitTask()
                                             until game:IsLoaded()
-                                            localPlayer = Players.LocalPlayer
-                                            name = localPlayer.Name
-                                            currentCamera = Workspace.CurrentCamera
-                                            Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-                                                currentCamera = Workspace.CurrentCamera
+localPlayer = Players.LocalPlayer
+name = localPlayer.Name
+currentCamera = Workspace.CurrentCamera
+                                         Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+=currentCamera = Workspace.CurrentCamera
                                             end)
-                                            remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
-                                            packages = ReplicatedStorage.Packages
-                                            controllers = ReplicatedStorage.Controllers
-                                            balls = Workspace.Balls
-                                            alive = Workspace.Alive
-                                            runtime = Workspace.Runtime
-                                            dataPing = statsService.Network.ServerStatsItem["Data Ping"]
-                                            heartbeat = runService.Heartbeat
-                                            preSimulation = runService.PreSimulation
-                                            postSimulation = runService.PostSimulation
+remotes = ReplicatedStorage:WaitForChild("Remotes", 10)
+packages = ReplicatedStorage.Packages
+controllers = ReplicatedStorage.Controllers
+balls = Workspace.Balls
+alive = Workspace.Alive
+runtime = Workspace.Runtime
+dataPing = statsService.Network.ServerStatsItem["Data Ping"]
+heartbeat = runService.Heartbeat
+preSimulation = runService.PreSimulation
+postSimulation = runService.PostSimulation
                                         end
                                     end
-                                    swordEventConnections = {
-                                        parry_connections = {
-                                        },
-                                        fire_sword_connections = {
-                                        },
-                                        play_parry = nil,
-                                        sword_fn = nil,
-                                    }
+swordEventConnections = {
+parry_connections = {
+},
+fire_sword_connections = {
+},
+play_parry = nil,
+sword_fn = nil,
+}
                                     if remotes and type(getconnections) == "function" then
                                         do
                                             local parrySuccessAll = remotes:WaitForChild("ParrySuccessAll", 10)
@@ -103,8 +103,8 @@ do
                                                                 return auxiliaryValue.Function
                                                             end)
                                                             if candidateValue and type(resultValue) == "function" then
-                                                                insertIntoTable(swordEventConnections.parry_connections, auxiliaryValue)
-                                                                swordEventConnections.play_parry = resultValue
+insertIntoTable(swordEventConnections.parry_connections, auxiliaryValue)
+swordEventConnections.play_parry = resultValue
                                                             end
                                                         end
                                                     end
@@ -120,56 +120,56 @@ do
                                                         return candidateValue.Function
                                                     end)
                                                     if resultValue and type(errorValue) == "function" then
-                                                        insertIntoTable(swordEventConnections.fire_sword_connections, candidateValue)
-                                                        swordEventConnections.sword_fn = errorValue
+insertIntoTable(swordEventConnections.fire_sword_connections, candidateValue)
+swordEventConnections.sword_fn = errorValue
                                                     end
                                                 end
                                             end
                                         end
                                     end
-                                    configStorage = {
-                                        folder = "oxy",
+configStorage = {
+                                        folder = "nikahub",
                                     }
-                                    configStorage.storage_ok = type(readfile) == "function" and type(writefile) == "function"
-                                    configStorage.last_saved = {
+configStorage.storage_ok = type(readfile) == "function" and type(writefile) == "function"
+configStorage.last_saved = {
                                     }
                                     configStorage.has_saved = false
-                                    configStorage.defaults = {
-                                        accuracy = 100,
-                                        spam_threshold = 3,
-                                        curve_keybind = false,
-                                        manual_notify = false,
-                                        curve_notify = false,
-                                        curve_method = "camera",
-                                        manual_spam = "E",
-                                        mobile_triggerbot_button = false,
-                                        mobile_manual_spam_button = false,
-                                        ability_esp = false,
-                                        auto_parry = false,
-                                        ball_debug = false,
-                                        auto_spam = false,
-                                        random_target = false,
-                                        unlock_all = false,
-                                        last_equipped_sword = "",
-                                        last_equipped_explosion = "",
-                                        favorite_swords = {
-                                        },
-                                        favorite_explosions = {
-                                        },
-                                        deleted_swords = {
-                                        },
-                                        deleted_explosions = {
-                                        },
-                                        fflag_profile = "default",
-                                        fflag_json = "",
-                                        fflag_auto_load = false,
-                                    }
-                                    configStorage.path = configStorage.folder .. "/config.json"
-                                    configStorage.fflag_folder = configStorage.folder .. "/fflags"
-                                    configStorage.trim = function(inputValue)
+configStorage.defaults = {
+accuracy = 100,
+spam_threshold = 3,
+curve_keybind = false,
+manual_notify = false,
+curve_notify = false,
+curve_method = "camera",
+manual_spam = "E",
+mobile_triggerbot_button = false,
+mobile_manual_spam_button = false,
+ability_esp = false,
+auto_parry = false,
+ball_debug = false,
+auto_spam = false,
+random_target = false,
+unlock_all = false,
+last_equipped_sword = "",
+last_equipped_explosion = "",
+favorite_swords = {
+},
+favorite_explosions = {
+},
+deleted_swords = {
+},
+deleted_explosions = {
+},
+fflag_profile = "default",
+fflag_json = "",
+fflag_auto_load = false,
+}
+configStorage.path = configStorage.folder .. "/config.json"
+configStorage.fflag_folder = configStorage.folder .. "/fflags"
+configStorage.trim = function(inputValue)
                                         return tostring(inputValue or ""):match("^%s*(.-)%s*$")
                                     end
-                                    configStorage.ensure_folder = function()
+configStorage.ensure_folder = function()
                                         local tertiaryValue = "function"
                                         if type(makefolder) ~= tertiaryValue then
                                             return 
@@ -178,15 +178,15 @@ do
                                         local conditionFlagA = false
                                         if type(isfolder) == quaternaryValue then
                                             local auxiliaryValue
-                                            auxiliaryValue, conditionFlagA = pcall(isfolder, configStorage.folder)
-                                            conditionFlagA = auxiliaryValue and conditionFlagA
+auxiliaryValue, conditionFlagA = pcall(isfolder, configStorage.folder)
+conditionFlagA = auxiliaryValue and conditionFlagA
                                         end
                                         if not conditionFlagA then
-                                            pcall(makefolder, configStorage.folder)
+pcall(makefolder, configStorage.folder)
                                         end
                                     end
-                                    configStorage.ensure_fflag_folder = function()
-                                        configStorage.ensure_folder()
+configStorage.ensure_fflag_folder = function()
+configStorage.ensure_folder()
                                         if type(makefolder) ~= "function" then
                                             return 
                                         end
@@ -194,11 +194,11 @@ do
                                         local conditionFlagA = false
                                         if type(isfolder) == tertiaryValue then
                                             local quaternaryValue
-                                            quaternaryValue, conditionFlagA = pcall(isfolder, configStorage.fflag_folder)
-                                            conditionFlagA = quaternaryValue and conditionFlagA
+quaternaryValue, conditionFlagA = pcall(isfolder, configStorage.fflag_folder)
+conditionFlagA = quaternaryValue and conditionFlagA
                                         end
                                         if not conditionFlagA then
-                                            pcall(makefolder, configStorage.fflag_folder)
+pcall(makefolder, configStorage.fflag_folder)
                                         end
                                     end
                                     configStorage.copy = function(inputValue)
@@ -209,11 +209,11 @@ do
                                         local ballState = {
                                         }
                                         for k, quaternaryValue in inputValue, nil, nil do
-                                            ballState[k] = configStorage.copy(quaternaryValue)
+ballState[k] = configStorage.copy(quaternaryValue)
                                         end
                                         return ballState
                                     end
-                                    configStorage.equal = function(inputValue, secondaryInput)
+configStorage.equal = function(inputValue, secondaryInput)
                                         if inputValue == secondaryInput then
                                             return true
                                         end
@@ -268,32 +268,32 @@ do
                                                 ballState[k] = type(conditionFlagA) == type(tertiaryValue) and conditionFlagA or tertiaryValue
                                             end
                                         end
-                                        ballState.accuracy = clampValue(floorValue(ballState.accuracy + 0.5), 1, 100)
-                                        ballState.spam_threshold = clampValue(floorValue(ballState.spam_threshold + 0.5), 1, 3)
+         ballState.accuracy = clampValue(floorValue(ballState.accuracy + 0.5), 1, 100)
+    ballState.spam_threshold = clampValue(floorValue(ballState.spam_threshold + 0.5), 1, 3)
                                         if not findInTable(curveMethods, ballState.curve_method) then
-                                            ballState.curve_method = configStorage.defaults.curve_method
+       ballState.curve_method = configStorage.defaults.curve_method
                                         end
                                         if not configStorage.valid_key(ballState.manual_spam) then
-                                            ballState.manual_spam = configStorage.defaults.manual_spam
+       ballState.manual_spam = configStorage.defaults.manual_spam
                                         end
                                         ballState.fflag_profile = configStorage.trim(ballState.fflag_profile)
                                         if ballState.fflag_profile == "" then
-                                            ballState.fflag_profile = configStorage.defaults.fflag_profile
+            ballState.fflag_profile = configStorage.defaults.fflag_profile
                                         end
                                         return ballState
                                     end
                                     do
                                         local data = nil
                                         if configStorage.storage_ok then
-                                            configStorage.ensure_folder()
+                              configStorage.ensure_folder()
                                             pcall(function()
-                                                data = httpService:JSONDecode(readfile(configStorage.path))
+                                      data = httpService:JSONDecode(readfile(configStorage.path))
                                             end)
                                         end
                                         _G.config = configStorage.normalize(data)
                                     end
-                                    config = _G.config
-                                    configStorage.changed = function()
+                        config = _G.config
+            configStorage.changed = function()
                                         if not configStorage.has_saved then
                                             return true
                                         end
@@ -312,31 +312,31 @@ do
                                         end
                                         return false
                                     end
-                                    configStorage.save = function()
-                                        if not (not configStorage.storage_ok or not configStorage.changed()) then
-                                            local ballState = {
-                                            }
-                                            for k, tertiaryValue in configStorage.defaults, nil, nil do
-                                                local quaternaryValue = config[k]
-                                                if type(tertiaryValue) == "table" then
-                                                    ballState[k] = type(quaternaryValue) == "table" and configStorage.copy(quaternaryValue) or configStorage.copy(tertiaryValue)
+                               configStorage.save = function()
+                                     if not (not configStorage.storage_ok or not configStorage.changed()) then
+                                        local ballState = {
+}
+                                 for k, tertiaryValue in configStorage.defaults, nil, nil do
+                                     local quaternaryValue = config[k]
+                                       if type(tertiaryValue) == "table" then
+ballState[k] = type(quaternaryValue) == "table" and configStorage.copy(quaternaryValue) or configStorage.copy(tertiaryValue)
                                                 else
-                                                    ballState[k] = type(quaternaryValue) == type(tertiaryValue) and quaternaryValue or tertiaryValue
+                                       ballState[k] = type(quaternaryValue) == type(tertiaryValue) and quaternaryValue or tertiaryValue
                                                 end
                                             end
                                             local tertiaryValue, quaternaryValue = pcall(function()
-                                                return httpService:JSONEncode(ballState)
+                                     return httpService:JSONEncode(ballState)
                                             end)
                                             if not tertiaryValue then
                                                 return 
-                                            end
-                                            configStorage.ensure_folder()
+                                         end
+                              configStorage.ensure_folder()
                                             if not pcall(writefile, configStorage.path, quaternaryValue) then
                                                 return 
                                             end
                                             for k in configStorage.defaults, nil, nil do
                                                 local auxiliaryValue = ballState[k]
-                                                configStorage.last_saved[k] = type(auxiliaryValue) == "table" and configStorage.copy(auxiliaryValue) or auxiliaryValue
+                                  configStorage.last_saved[k] = type(auxiliaryValue) == "table" and configStorage.copy(auxiliaryValue) or auxiliaryValue
                                             end
                                             configStorage.has_saved = true
                                             return 
@@ -350,9 +350,9 @@ do
                                     end
                                     fflagProfiles = {
                                         dropdown = nil,
-                                        path = function(inputValue)
-                                            local tertiaryValue = configStorage.trim(inputValue)
-                                            if tertiaryValue == "" then
+path = function(inputValue)
+                                      local tertiaryValue = configStorage.trim(inputValue)
+                                   if tertiaryValue == "" then
                                                 return nil, "profile name is empty"
                                             end
                                             local sanitizedProfileName = tertiaryValue:gsub("[<>:\"/\\|%?%*%c]", "_"):sub(1, 64)
@@ -519,14 +519,14 @@ do
                             end
                             configStorage.save()
                             spawnTask(function()
-                                while _G.oxyFluent do
+                                while _G.nikaFluent do
                                     waitTask(1)
                                     configStorage.save()
                                 end
                             end)
                             local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-                            local oxy = Fluent:CreateWindow({
-                                Title = "Oxy",
+                            local nika = Fluent:CreateWindow({
+                                Title = "Nikahub",
                                 TabWidth = 145,
                                 Size = UDim2.fromOffset(440, 315),
                                 Acrylic = false,
@@ -534,10 +534,10 @@ do
                                 MinimizeKey = Enum.KeyCode.LeftControl,
                             })
                             do
-                                local combat = oxy:AddTab({ Title = "Combat", Icon = "swords" })
-                                local visual2 = oxy:AddTab({ Title = "Visual", Icon = "eye" })
-                                local misc2 = oxy:AddTab({ Title = "Misc", Icon = "settings" })
-                                fflagsTab = oxy:AddTab({ Title = "FFlags", Icon = "file-json" })
+                                local combat = nika:AddTab({ Title = "Combat", Icon = "swords" })
+                                local visual2 = nika:AddTab({ Title = "Visual", Icon = "eye" })
+                                local misc2 = nika:AddTab({ Title = "Misc", Icon = "settings" })
+                                fflagsTab = nika:AddTab({ Title = "FFlags", Icon = "file-json" })
                                 local combatSection = combat:AddSection("")
                                 local visualSection = visual2:AddSection("")
                                 local miscSection = misc2:AddSection("")
@@ -2030,7 +2030,7 @@ do
                         if touchEnabled then
                             do
                                 local ScreenGui = createGuiInstance("ScreenGui", {
-                                    Name = "oxy_mobile",
+                                    Name = "nika_mobile",
                                     ResetOnSpawn = false,
                                     IgnoreGuiInset = true,
                                     DisplayOrder = 50,
@@ -2172,7 +2172,7 @@ do
                             }, {
                                 __mode = "k",
                             })
-                            inventoryUnlockManager.modern_tag = "oxy_unlock_all"
+                            inventoryUnlockManager.modern_tag = "nika_unlock_all"
                             inventoryUnlockManager.original_set_equipped = nil
                             inventoryUnlockManager.original_buy_fns = {
                             }
@@ -3264,7 +3264,7 @@ do
                                     candidateValue = nil
                                 end
                                 if not quaternaryValue and not candidateValue then
-                                    warn("[oxy] unlock all: failed to load shop controllers")
+                                    warn("[nika] unlock all: failed to load shop controllers")
                                     return 
                                 end
                                 inputValue.shop_controller = quaternaryValue
