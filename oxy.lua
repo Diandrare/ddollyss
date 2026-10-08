@@ -13,10 +13,10 @@ do
                                 do
                                     local secondaryValue
                                     do
-                                        if _G.nikaHub then
+                                        if _G.nikaFluent then
                                             return 
                                         end
-                                        _G.nikaHub = true
+                                        _G.nikaFluent = true
                                         cloneref = cloneref or function(inputValue)
                                             return inputValue
                                         end
@@ -519,48 +519,51 @@ do
                             end
                             configStorage.save()
                             spawnTask(function()
-                                while _G.nikaHub do
+                                while _G.nikaFluent do
                                     waitTask(1)
                                     configStorage.save()
                                 end
                             end)
-
-                            -- Load Acrylic UI Library
-                            local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/noowtf31-ui/Arcylic/refs/heads/main/src.lua.txt"))()
-                            local window = Library.new("Nika Hub", "NikaHubConfigs")
-                            window:SetToggleKey(Enum.KeyCode.LeftControl)
-
-                            -- Create Sections & Tabs matching original structure
-                            local CombatSection = window:CreateSection("Combat")
-                            local VisualSection = window:CreateSection("Visual")
-                            local MiscSection = window:CreateSection("Misc")
-                            local FFlagsSection = window:CreateSection("FFlags")
-
-                            parrySection = CombatSection:CreateTab("Parry", "rbxassetid://10723407389")
-                            curve = CombatSection:CreateTab("Curve", "rbxassetid://10723407389")
-                            spam = CombatSection:CreateTab("Spam", "rbxassetid://10723407389")
-                            hotkeys = CombatSection:CreateTab("Hotkeys", "rbxassetid://10723407389")
-
-                            visual = VisualSection:CreateTab("Visuals", "rbxassetid://10734898355")
-                            misc = MiscSection:CreateTab("Misc", "rbxassetid://10734898355")
-
-                            fflagsTab = FFlagsSection:CreateTab("FFlags", "rbxassetid://10734898355")
-                            profile = fflagsTab
-                            fflagsSection = fflagsTab
+                            local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+                            local nika = Fluent:CreateWindow({
+                                Title = "Nika Hub",
+                                TabWidth = 145,
+                                Size = UDim2.fromOffset(440, 315),
+                                Acrylic = false,
+                                Theme = "Dark",
+                                MinimizeKey = Enum.KeyCode.LeftControl,
+                            })
+                            do
+                                local combat = nika:AddTab({ Title = "Combat", Icon = "swords" })
+                                local visual2 = nika:AddTab({ Title = "Visual", Icon = "eye" })
+                                local misc2 = nika:AddTab({ Title = "Misc", Icon = "settings" })
+                                fflagsTab = nika:AddTab({ Title = "FFlags", Icon = "file-json" })
+                                local combatSection = combat:AddSection("")
+                                local visualSection = visual2:AddSection("")
+                                local miscSection = misc2:AddSection("")
+                                parrySection = combatSection
+                                curve = combatSection
+                                spam = combatSection
+                                hotkeys = combatSection
+                                visual = visualSection
+                                misc = miscSection
+                            end
                         end
-
-                        local profileNameInput, flagsJsonInput
+                        local profile, fflagsSection, profileNameInput, flagsJsonInput
                         do
-                            notificationService = {
-                                notify = function(_, notification)
-                                    window:Notify({
-                                        Title = notification.title or "Nika Hub",
-                                        Description = notification.content or "",
-                                        Duration = notification.duration or 3,
-                                    })
-                                end,
-                            }
-
+                            do
+                                profile = fflagsTab:AddSection("Profile")
+                                fflagsSection = fflagsTab:AddSection("FFlags JSON")
+                                notificationService = {
+                                    notify = function(_, notification)
+                                        Fluent:Notify({
+                                            Title = notification.title,
+                                            Content = notification.content,
+                                            Duration = notification.duration,
+                                        })
+                                    end,
+                                }
+                            end
                             createGuiInstance = function(inputValue, secondaryInput)
                                 local auxiliaryValue = createInstance(inputValue)
                                 for k, candidateValue in secondaryInput, nil, nil do
@@ -571,7 +574,6 @@ do
                                 auxiliaryValue.Parent = secondaryInput.Parent
                                 return auxiliaryValue
                             end
-
                             do
                                 fflagProfiles.notify_result = function(inputValue, secondaryInput)
                                     notificationService:notify({
@@ -593,15 +595,28 @@ do
                                     end
                                     return auxiliaryValue
                                 end
-
-                                fflagsTab:CreateSection("Profile Settings")
-                                
-                                -- Replaced Inputs with Dropdown/Sliders/Toggles/Buttons available in Arcylic UI
-                                profileNameInput = { Value = config.fflag_profile, SetValue = function(self, val) self.Value = val end }
-                                flagsJsonInput = { Value = config.fflag_json, SetValue = function(self, val) self.Value = val end }
+                                profileNameInput = profile:AddInput("ProfileName", {
+                                    Title = "Profile name",
+                                    Description = "Saved profile name",
+                                    Default = config.fflag_profile,
+                                    Placeholder = "default",
+                                    Finished = true,
+                                    Callback = function(inputValue)
+                                        config.fflag_profile = configStorage.trim(inputValue)
+                                    end,
+                                })
+                                flagsJsonInput = fflagsSection:AddInput("FflagsJson", {
+                                    Title = "FFlags JSON",
+                                    Description = "JSON object containing flag values",
+                                    Default = config.fflag_json,
+                                    Placeholder = "{\"DFIntTaskSchedulerTargetFps\":\"240\"}",
+                                    Finished = true,
+                                })
+                                flagsJsonInput:OnChanged(function(fflagJson)
+                                    config.fflag_json = fflagJson
+                                end)
                             end
                         end
-
                         do
                             fflagProfiles.load_into_editor = function(inputValue)
                                 local auxiliaryValue, candidateValue, resultValue = fflagProfiles.path(inputValue)
@@ -621,17 +636,16 @@ do
                             end
                             fflagProfiles.refresh_dropdown = function(inputValue)
                                 local auxiliaryValue = fflagProfiles.options()
-                                if fflagProfiles.dropdown and fflagProfiles.dropdown.SetOptions then
-                                    fflagProfiles.dropdown:SetOptions(auxiliaryValue)
-                                end
+                                fflagProfiles.dropdown:SetValues(auxiliaryValue)
+                                fflagProfiles.dropdown:SetValue(findInTable(auxiliaryValue, inputValue) and inputValue or auxiliaryValue[1])
                             end
                             do
                                 local auxiliaryValue, candidateValue = fflagProfiles.options()
-                                fflagProfiles.dropdown = profile:CreateDropdown({
-                                    Name = "Saved Profiles",
-                                    Options = auxiliaryValue,
+                                fflagProfiles.dropdown = profile:AddDropdown("SavedProfiles", {
+                                    Title = "Saved profiles",
+                                    Values = auxiliaryValue,
+                                    Multi = false,
                                     Default = findInTable(auxiliaryValue, config.fflag_profile) and config.fflag_profile or auxiliaryValue[1],
-                                    Flag = "SavedProfiles",
                                     Callback = function(inputValue)
                                         if not fflagProfiles.is_option(inputValue) then
                                             return
@@ -649,25 +663,99 @@ do
                                 end
                             end
                         end
+                        profile:AddButton({ Title = "Save profile", Callback = function()
+                            local auxiliaryValue, candidateValue, resultValue = fflagProfiles.save_profile(configStorage.trim(profileNameInput.Value), flagsJsonInput.Value)
+                            if auxiliaryValue then
+                                config.fflag_profile = resultValue
+                                config.fflag_json = candidateValue
+                                profileNameInput:SetValue(resultValue)
+                                flagsJsonInput:SetValue(candidateValue)
+                                configStorage.save()
+                                fflagProfiles.refresh_dropdown(resultValue)
+                                fflagProfiles.notify_result(true, formatString("saved profile '%s'", resultValue))
+                            else
+                                fflagProfiles.notify_result(false, candidateValue)
+                            end
+                        end })
+                        profile:AddButton({ Title = "Load profile", Callback = function()
+                            local loadIntoEditor = fflagProfiles.load_into_editor
+                            local auxiliaryValue = table.pack(configStorage.trim(profileNameInput.Value))
+                            auxiliaryValue.n = 1 + auxiliaryValue.n - 1
+                            table.move(auxiliaryValue, 1, auxiliaryValue.n, 1, auxiliaryValue)
+                            local candidateValue, resultValue = loadIntoEditor(table.unpack(auxiliaryValue, 1, auxiliaryValue.n))
+                            if candidateValue then
+                                if true then
+                                    fflagProfiles.refresh_dropdown(resultValue)
+                                    fflagProfiles.notify_result(true, formatString("loaded profile '%s'", resultValue))
+                                else
+                                    while true do
 
-                        -- Toggle Auto Load
-                        local autoLoadToggle = profile:CreateToggle({
-                            Name = "Auto Load Profile",
-                            Default = config.fflag_auto_load or false,
-                            Flag = "AutoLoad",
-                            Callback = function(fflagAutoLoad)
+                                    end
+                                end
+                            else
+                                fflagProfiles.notify_result(false, resultValue)
+                            end
+                        end })
+                        do
+                            local auxiliaryValue = profile:AddToggle("AutoLoad", {
+                                Title = "Auto load profile",
+                                Default = config.fflag_auto_load,
+                                Callback = function(fflagAutoLoad)
                                 config.fflag_auto_load = fflagAutoLoad
                                 configStorage.save()
                             end,
-                        })
-
+                            })
+                            profile:AddButton({ Title = "Set selected as auto load", Callback = function()
+                                local candidateValue = fflagProfiles.dropdown.Value
+                                if not fflagProfiles.is_option(candidateValue) then
+                                    fflagProfiles.notify_result(false, "select a saved profile first")
+                                    return 
+                                end
+                                local resultValue, errorValue = fflagProfiles.load_into_editor(candidateValue)
+                                if not resultValue then
+                                    fflagProfiles.notify_result(false, errorValue)
+                                    return 
+                                end
+                                auxiliaryValue:SetValue(true)
+                                fflagProfiles.notify_result(true, formatString("auto load set to '%s'", errorValue))
+                            end })
+                            profile:AddButton({ Title = "Delete selected profile", Callback = function()
+                                local candidateValue = fflagProfiles.dropdown.Value
+                                if not fflagProfiles.is_option(candidateValue) then
+                                    fflagProfiles.notify_result(false, "select a saved profile first")
+                                    return 
+                                end
+                                local resultValue, errorValue = fflagProfiles.delete(candidateValue)
+                                if not resultValue then
+                                    fflagProfiles.notify_result(false, errorValue)
+                                    return 
+                                end
+                                if config.fflag_profile == candidateValue then
+                                    config.fflag_profile = configStorage.defaults.fflag_profile
+                                    config.fflag_json = ""
+                                    profileNameInput:SetValue(configStorage.defaults.fflag_profile)
+                                    flagsJsonInput:SetValue("")
+                                    auxiliaryValue:SetValue(false)
+                                end
+                                fflagProfiles.refresh_dropdown()
+                                configStorage.save()
+                                fflagProfiles.notify_result(true, formatString("deleted profile '%s'", candidateValue))
+                            end })
+                        end
+                        fflagsSection:AddParagraph({ Title = "Format", Content = "{\"FFlagName\":\"value\"}" })
+                        fflagsSection:AddButton({ Title = "Apply FFlags", Callback = function()
+                            config.fflag_profile = configStorage.trim(profileNameInput.Value)
+                            config.fflag_json = flagsJsonInput.Value
+                            configStorage.save()
+                            local auxiliaryValue, candidateValue = fflagProfiles.apply(config.fflag_json)
+                            fflagProfiles.notify_result(auxiliaryValue, candidateValue)
+                        end })
                         if runtimeConnections then
                             deferTask(function()
                                 fflagProfiles.notify_result(runtimeConnections.ok, runtimeConnections.message)
                             end)
                         end
                     end
-
                     local runtimeConnections, ballState, touchEnabled, keyboardEnabled, gamepadEnabled, spamController, abilityEspState, triggerbotState
                     do
                         local inventoryUnlockManager, curveController, swordAnimationState, parryController, helperFunction
@@ -1517,7 +1605,7 @@ do
                                     runtimeConnections.auto_parry = nil
                                 end
                             end
-                            parrySection:CreateToggle({ Name = "Auto Parry", Default = config.auto_parry or false, Flag = "AutoParry", Callback = parryState.set })
+                            parrySection:AddToggle("AutoParry", { Title = "Auto parry", Default = config.auto_parry or false, Callback = parryState.set })
                             remotes.ParrySuccessAll.OnClientEvent:Connect(function(inputValue, secondaryInput)
                                 if secondaryInput.Parent and secondaryInput.Parent ~= localPlayer.Character and secondaryInput.Parent.Parent ~= alive then
                                     return 
@@ -1597,13 +1685,13 @@ do
                                     ballState.state.Curving = tick()
                                 end
                             end)
-                            parrySection:CreateSlider({ Name = "Accuracy", Min = 1, Max = 100, Default = config.accuracy or 100, Flag = "Accuracy", Callback = function(accuracy)
+                            parrySection:AddSlider("Accuracy", { Title = "Accuracy", Min = 1, Max = 100, Default = config.accuracy or 100, Rounding = 1, Callback = function(accuracy)
                                 parryState.accuracy = (accuracy - 1) * 0.015151515151515152
                                 config.accuracy = accuracy
                             end })
                             parryState.accuracy = (config.accuracy - 1) * 0.015151515151515152
                         end
-                        parrySection:CreateToggle({ Name = "Random Target", Default = config.random_target or false, Flag = "RandomTarget", Callback = function(randomTarget)
+                        parrySection:AddToggle("RandomTarget", { Title = "Random target", Default = config.random_target or false, Callback = function(randomTarget)
                             spawnTask(function()
                                 config.random_target = randomTarget
                                 inventoryUnlockManager.current = nil
@@ -1621,11 +1709,11 @@ do
                             [Enum.KeyCode.Four] = "slow",
                             [Enum.KeyCode.Five] = "random",
                         }
-                        curveController.dropdown = curve:CreateDropdown({
-                            Name = "Curve Method",
-                            Options = curveMethods,
+                        curveController.dropdown = curve:AddDropdown("CurveMethod", {
+                            Title = "Curve method",
+                            Values = curveMethods,
+                            Multi = false,
                             Default = config.curve_method or "camera",
-                            Flag = "CurveMethod",
                             Callback = function(curveMethod)
                             local syncing = curveController.syncing
                             spawnTask(function()
@@ -1684,12 +1772,12 @@ do
                                 })
                             end
                         end)
-                        hotkeys:CreateToggle({ Name = "Hotkey Curve", Default = config.curve_keybind or false, Flag = "HotkeyCurve", Callback = function(curveKeybind)
+                        hotkeys:AddToggle("hotkey_curve", { Title = "Hotkey curve", Default = config.curve_keybind or false, Callback = function(curveKeybind)
                             spawnTask(function()
                                 config.curve_keybind = curveKeybind
                             end)
                         end })
-                        hotkeys:CreateToggle({ Name = "Hotkey Notify", Default = config.curve_notify or false, Flag = "HotkeyNotify", Callback = function(curveNotify)
+                        hotkeys:AddToggle("hotkey_notify", { Title = "Hotkey notify", Default = config.curve_notify or false, Callback = function(curveNotify)
                             spawnTask(function()
                                 config.curve_notify = curveNotify
                             end)
@@ -1747,7 +1835,7 @@ do
                             triggerbotState.update_button()
                         end
                         if touchEnabled then
-                            hotkeys:CreateToggle({ Name = "Triggerbot Button", Default = config.mobile_triggerbot_button or false, Flag = "MobileTriggerbotButton", Callback = function(mobileTriggerbotButton)
+                            hotkeys:AddToggle("triggerbot_button", { Title = "Triggerbot button", Default = config.mobile_triggerbot_button or false, Callback = function(mobileTriggerbotButton)
                                 config.mobile_triggerbot_button = mobileTriggerbotButton
                                 if triggerbotState.button then
                                     triggerbotState.button.Visible = mobileTriggerbotButton
@@ -1811,8 +1899,8 @@ do
                                 runtimeConnections.auto_spam = nil
                             end
                         end
-                        spam:CreateToggle({ Name = "Auto Spam", Default = config.auto_spam or false, Flag = "AutoSpam", Callback = spamController.set_auto })
-                        spam:CreateSlider({ Name = "Threshold", Min = 1, Max = 3, Default = config.spam_threshold or 3, Flag = "SpamThreshold", Callback = function(inputValue)
+                        spam:AddToggle("AutoSpam", { Title = "Auto spam", Default = config.auto_spam or false, Callback = spamController.set_auto })
+                        spam:AddSlider("Threshold", { Title = "Threshold", Min = 1, Max = 3, Default = config.spam_threshold or 3, Rounding = 1, Callback = function(inputValue)
                             spawnTask(function()
                                 if true then
                                     config.spam_threshold = tonumber(inputValue)
@@ -1873,7 +1961,7 @@ do
                     end
                     do
                         if touchEnabled then
-                            hotkeys:CreateToggle({ Name = "Manual Spam Button", Default = config.mobile_manual_spam_button or false, Flag = "MobileManualSpamButton", Callback = function(mobileManualSpamButton)
+                            hotkeys:AddToggle("manual_spam_button", { Title = "Manual spam button", Default = config.mobile_manual_spam_button or false, Callback = function(mobileManualSpamButton)
                                 config.mobile_manual_spam_button = mobileManualSpamButton
                                 if spamController.mobile_button then
                                     spamController.mobile_button.Visible = mobileManualSpamButton
@@ -1882,6 +1970,49 @@ do
                                     spamController.set_manual(false)
                                 end
                             end })
+                        end
+                        do
+                            local conditionFlagA = false
+                            local function helperFunction()
+                                if conditionFlagA or not keyboardEnabled and not gamepadEnabled then
+                                    return 
+                                end
+                                conditionFlagA = true
+                                hotkeys:AddKeybind("TriggerbotKey", {
+                                    Title = "Triggerbot key",
+                                    Default = triggerbotState.key.Name,
+                                    Mode = "Toggle",
+                                    ChangedCallback = function(key)
+                                        if key ~= triggerbotState.key then
+                                            triggerbotState.key = key
+                                        end
+                                    end,
+                                })
+                                hotkeys:AddKeybind("ManualSpamKey", {
+                                    Title = "Manual spam key",
+                                    Default = spamController.manual_key.Name,
+                                    Mode = "Toggle",
+                                    ChangedCallback = function(manualKey)
+                                        if manualKey ~= spamController.manual_key then
+                                            spamController.manual_key = manualKey
+                                            config.manual_spam = manualKey.Name
+                                        end
+                                    end,
+                                })
+                            end
+                            helperFunction()
+                            UserInputService.GamepadConnected:Connect(function()
+                                gamepadEnabled = true
+                                helperFunction()
+                            end)
+                            UserInputService:GetPropertyChangedSignal("KeyboardEnabled"):Connect(function()
+                                keyboardEnabled = UserInputService.KeyboardEnabled
+                                helperFunction()
+                            end)
+                            UserInputService:GetPropertyChangedSignal("GamepadEnabled"):Connect(function()
+                                gamepadEnabled = UserInputService.GamepadEnabled
+                                helperFunction()
+                            end)
                         end
                     end
                     do
@@ -1994,10 +2125,10 @@ do
                             triggerbotState.update_button()
                             spamController.update_button()
                         end
-                        spam:CreateToggle({ Name = "Manual Notify", Default = config.manual_notify or false, Flag = "ManualNotify", Callback = function(manualNotify)
+                        spam:AddToggle("manual_notify", { Title = "Manual notify", Default = config.manual_notify or false, Callback = function(manualNotify)
                             config.manual_notify = manualNotify
                         end })
-                        visual:CreateToggle({ Name = "Ability ESP", Default = config.ability_esp or false, Flag = "AbilityESP", Callback = function(abilityEsp)
+                        visual:AddToggle("ability_esp", { Title = "Ability ESP", Default = config.ability_esp or false, Callback = function(abilityEsp)
                             config.ability_esp = abilityEsp
                             for k, primaryValue in abilityEspState.labels, nil, nil do
                                 if primaryValue and primaryValue.Parent then
@@ -3133,7 +3264,7 @@ do
                                     candidateValue = nil
                                 end
                                 if not quaternaryValue and not candidateValue then
-                                    warn("[oxy] unlock all: failed to load shop controllers")
+                                    warn("[nika] unlock all: failed to load shop controllers")
                                     return 
                                 end
                                 inputValue.shop_controller = quaternaryValue
