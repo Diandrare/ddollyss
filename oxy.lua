@@ -524,7 +524,7 @@ do
                                     configStorage.save()
                                 end
                             end)
-                            local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+                            local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/Diandrare/ddollyss/refs/heads/main/NikaUI.lua"))()
                             local nika = Fluent:CreateWindow({
                                 Title = "Nika Hub",
                                 TabWidth = 145,
