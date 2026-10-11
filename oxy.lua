@@ -13,10 +13,10 @@ do
                                 do
                                     local secondaryValue
                                     do
-                                        if _G.nikaFluent then
+                                        if _G.nikahub then
                                             return 
                                         end
-                                        _G.nikaFluent = true
+                                        _G.nikahub = true
                                         cloneref = cloneref or function(inputValue)
                                             return inputValue
                                         end
@@ -519,12 +519,12 @@ do
                             end
                             configStorage.save()
                             spawnTask(function()
-                                while _G.nikaFluent do
+                                while _G.nikahub do
                                     waitTask(1)
                                     configStorage.save()
                                 end
                             end)
-                            local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/Diandrare/ddollyss/refs/heads/main/NikaUI.lua"))()
+                            local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
                             local nika = Fluent:CreateWindow({
                                 Title = "Nika Hub",
                                 TabWidth = 145,
