@@ -35,16 +35,27 @@ local function nextIdx()
     return _idxCounter
 end
 
-Rise.ImageManager = {
-    _assets = {},
-    AddAsset = function(self, name, _, url)
-        self._assets[name] = url
-        return url
-    end,
-    GetAsset = function(self, name)
-        return self._assets[name]
-    end,
-}
+local _imgAssets = {}
+Rise.ImageManager = { _assets = _imgAssets }
+
+local function _imgAdd(a, b, c, d)
+    local name, url
+    if type(a) == "table" and a == Rise.ImageManager then
+        name, url = b, d
+    else
+        name, url = a, c
+    end
+    _imgAssets[name] = url
+    return url
+end
+
+local function _imgGet(a, b)
+    local name = (type(a) == "table" and a == Rise.ImageManager) and b or a
+    return _imgAssets[name]
+end
+
+Rise.ImageManager.AddAsset = _imgAdd
+Rise.ImageManager.GetAsset = _imgGet
 
 function Rise:Notify(opts)
     pcall(function()
