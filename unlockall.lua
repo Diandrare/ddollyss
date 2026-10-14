@@ -1,62 +1,425 @@
-repeat task.wait() until game:IsLoaded()
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local HttpService = game:GetService("HttpService")
-local TweenService = game:GetService("TweenService")
-local LocalPlayer = Players.LocalPlayer
-local unpack = table.unpack or unpack
-local getgenv = getgenv or function() return _G end
-local G = getgenv()
-
-local STANDALONE_VERSION = 4
-local reuseExistingBackend = G._lhxStandaloneUnlockAllLoaded
-    and type(G.updateSword) == "function"
-    and type(G.updateExplosion) == "function"
-
-if G._lhxStandaloneUnlockAllLoaded and G._lhxStandaloneUnlockAllVersion == STANDALONE_VERSION then
-    G.skinChanger = true
-    G.explosionChanger = true
-    warn("[Unlock All] The current standalone script is already running.")
-    return
-end
-
-if G._lhxStandaloneUnlockAllLoaded then
-    G._lhxStandaloneUnlockAllLoaded = false
-    task.wait(0.3)
-end
-G._lhxStandaloneUnlockAllVersion = STANDALONE_VERSION
-G._lhxStandaloneUnlockAllLoaded = true
-
-local function getExecutorGlobal(name)
-    if G[name] ~= nil then return G[name] end
-    if _G and _G[name] ~= nil then return _G[name] end
-    if shared and shared[name] ~= nil then return shared[name] end
-
-    local value
-    pcall(function()
-        local env = getrenv and getrenv()
-        if env then value = env[name] end
+        local exec = (identifyexecutor or function() return "" end)()
+        if type(exec) == "string" and exec:find("Xeno") then isXeno = true end
     end)
-    if value ~= nil then return value end
 
-    pcall(function()
-        local env = getfenv and getfenv(0)
-        if env then value = env[name] end
-    end)
-    return value
-end
+    if not isXeno then
+        local SkinTab = Window:Tab({ Title = "Unlock All", Icon = "box" })
 
-if not reuseExistingBackend then
+        local favoriteSwords = {}
+        pcall(function()
+            if isfile and isfile("LeviHubX/fav_swords.json") then
+                local decoded = HttpService:JSONDecode(readfile("LeviHubX/fav_swords.json"))
+                if type(decoded) == "table" then favoriteSwords = decoded end
+            end
+        end)
+        local function saveFavs()
+            pcall(function()
+                if isfolder and makefolder and not isfolder("LeviHubX") then makefolder("LeviHubX") end
+                if writefile then writefile("LeviHubX/fav_swords.json", HttpService:JSONEncode(favoriteSwords)) end
+            end)
+        end
+        local function refreshFavList() end
+        getgenv().setExplosionChangerToggleUI = function() end
+        getgenv().setExplosionInputUI = function() end
+        getgenv().setExplosionApplyText = function() end
+        getgenv().setLeviHubShopButtonText = function(button, text)
+            if not button then return end
+            for _, textObject in ipairs(button:GetDescendants()) do
+                if textObject:IsA("TextLabel")
+                    or textObject:IsA("TextButton")
+                    or textObject:IsA("TextBox") then
+                    textObject.Text = text
+                end
+            end
+            if button:IsA("TextButton") then
+                button.Text = text
+            end
+        end
+        getgenv().forceLeviHubShopEquippedText = function(shop, button, kind, itemName)
+            getgenv()._lhxShopForcedEquip = {
+                Button = button,
+                Kind = kind,
+                Name = itemName,
+                Until = os.clock() + 2.5,
+            }
 
-    G.setSkinChangerToggleUI = function() end
-    G.setExplosionChangerToggleUI = function() end
-    G.setExplosionInputUI = function() end
-    G.setExplosionApplyText = function() end
+            local function applyOnce()
+                local targetButton = button
+                if (not targetButton or not targetButton.Parent) and shop and shop:FindFirstChild("Holder") then
+                    local infoBG = shop.Holder:FindFirstChild("InfoBG")
+                    targetButton = infoBG and (infoBG:FindFirstChild("BuyButton") or infoBG:FindFirstChild("EquipButton"))
+                    if not targetButton and infoBG then
+                        for _, child in ipairs(infoBG:GetChildren()) do
+                            if (child:IsA("TextButton") or child:IsA("ImageButton")) and not child.Name:lower():find("close") then
+                                targetButton = child
+                                break
+                            end
+                        end
+                    end
+                end
+                getgenv().setLeviHubShopButtonText(targetButton, "Equipped")
+            end
+
+            applyOnce()
+            task.spawn(function()
+                while os.clock() < getgenv()._lhxShopForcedEquip.Until do
+                    applyOnce()
+                    task.wait(0.05)
+                end
+            end)
+        end
+
+        SkinTab:Section({ Title = "Unlock All" })
+        SkinTab:Toggle({
+            Title = "Unlock All",
+            Desc = "Unlocks sword and explosion shop pages locally",
+            Value = false,
+            Callback = function(v)
+                if not v then return end
+                local player = game:GetService("Players").LocalPlayer
+                local shop = player.PlayerGui:FindFirstChild("Shop")
+                if not shop then
+                    WindUI:Notify({ Title = "Error", Content = "Shop GUI not found!", Duration = 3 })
+                    return
+                end
+
+                if not getgenv().unlockAllHooked then
+                    getgenv()._lhxCurrentInfoItem = ""
+                    getgenv()._lhxCurrentInfoKind = ""
+                    getgenv().unlockAllHooked = true
+                    getgenv().skinChanger = true
+                    getgenv().explosionChanger = true
+                    if getgenv().setSkinChangerToggleUI then getgenv().setSkinChangerToggleUI(true) end
+                    if getgenv().setExplosionChangerToggleUI then getgenv().setExplosionChangerToggleUI(true) end
+
+                    task.spawn(function()
+                        while task.wait(0.4) do
+                            local pages = shop.Holder and shop.Holder:FindFirstChild("Pages")
+                            if (shop.Enabled == false) or (shop.Holder and shop.Holder.Visible == false) then
+                                getgenv()._lhxCurrentInfoItem = ""
+                                getgenv()._lhxCurrentInfoKind = ""
+                            end
+                            getgenv()._lhxCurrentShopKind = ""
+                            if pages then
+                                for _, activePageName in ipairs({"Sword", "Explosion"}) do
+                                    local activePage = pages:FindFirstChild(activePageName)
+                                    if activePage and activePage:IsA("GuiObject") and activePage.Visible then
+                                        getgenv()._lhxCurrentShopKind = activePageName
+                                        break
+                                    end
+                                end
+                            end
+                            if (getgenv()._lhxCurrentShopKind or "") ~= ""
+                                and (getgenv()._lhxCurrentInfoKind or "") ~= ""
+                                and getgenv()._lhxCurrentInfoKind ~= getgenv()._lhxCurrentShopKind then
+                                getgenv()._lhxCurrentInfoItem = ""
+                                getgenv()._lhxCurrentInfoKind = ""
+                            end
+                            for _, pageName in ipairs({"Sword", "Explosion"}) do
+                                local page = pages and pages:FindFirstChild(pageName)
+                                if page then
+                                    local unownedHeader = page:FindFirstChild("HeaderTitle")
+                                    if unownedHeader then
+                                        unownedHeader.Visible = false
+                                    end
+
+                                    for _, child in ipairs(page:GetDescendants()) do
+                                        if child.Name == "Lock" and child:IsA("GuiObject") then
+                                            child.Visible = false
+                                            local itemCard = child.Parent
+                                            if itemCard and itemCard:IsA("GuiObject") then
+                                                itemCard.LayoutOrder = 0
+                                                if itemCard.Parent and itemCard.Parent.Name == "Unowned" then
+                                                    local ownedContainer = page:FindFirstChild("Owned", true)
+                                                    if ownedContainer and ownedContainer:IsA("GuiObject") then
+                                                        itemCard.Parent = ownedContainer
+                                                    end
+                                                end
+                                                
+                                                local favBtn = itemCard:FindFirstChild("Favorite", true) or itemCard:FindFirstChild("Star", true)
+                                                local delBtn = itemCard:FindFirstChild("Delete", true) or itemCard:FindFirstChild("Trash", true)
+
+                                                if favBtn and favBtn:IsA("GuiObject") then favBtn.Visible = false end
+                                                if delBtn and delBtn:IsA("GuiObject") then delBtn.Visible = false end
+                                                
+                                                if not itemCard:FindFirstChild("LeviHubHooked") then
+                                                    local tag = Instance.new("BoolValue", itemCard)
+                                                    tag.Name = "LeviHubHooked"
+                                                    
+                                                    local itemName = itemCard.Name
+                                                    local itemKind = pageName
+                                                    local titleObj = itemCard:FindFirstChild("Title", true) or itemCard:FindFirstChild("ItemName", true) or itemCard:FindFirstChild("Name", true)
+                                                    if titleObj and titleObj:IsA("TextLabel") then itemName = titleObj.Text end
+                                                    
+                                                    if not itemCard:FindFirstChild("LeviHubItemHook") then
+                                                        local tag = Instance.new("BoolValue", itemCard)
+                                                        tag.Name = "LeviHubItemHook"
+                                                        itemCard.InputEnded:Connect(function(input)
+                                                            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                                                                getgenv()._lhxCurrentInfoItem = itemName
+                                                                getgenv()._lhxCurrentInfoKind = itemKind
+                                                            end
+                                                        end)
+                                                    end
+                                                    
+                                                    if favBtn and (favBtn:IsA("GuiButton") or favBtn:IsA("ImageButton") or favBtn:IsA("TextButton")) then
+                                                        favBtn.MouseButton1Click:Connect(function()
+                                                            local found = false
+                                                            for _, s in ipairs(favoriteSwords) do if s == itemName then found = true; break end end
+                                                            if not found then
+                                                                table.insert(favoriteSwords, itemName)
+                                                                pcall(function() saveFavs() end)
+                                                                pcall(function() refreshFavList() end)
+                                                                WindUI:Notify({ Title = "Favorites", Content = itemName .. " added to favorites.", Duration = 3 })
+                                                            else
+                                                                WindUI:Notify({ Title = "Favorites", Content = itemName .. " is already in favorites.", Duration = 3 })
+                                                            end
+                                                        end)
+                                                    end
+                                                    
+                                                    if delBtn and (delBtn:IsA("GuiButton") or delBtn:IsA("ImageButton") or delBtn:IsA("TextButton")) then
+                                                        delBtn.MouseButton1Click:Connect(function()
+                                                            local removed = false
+                                                            for i, s in ipairs(favoriteSwords) do
+                                                                if s == itemName then
+                                                                    table.remove(favoriteSwords, i)
+                                                                    pcall(function() saveFavs() end)
+                                                                    pcall(function() refreshFavList() end)
+                                                                    WindUI:Notify({ Title = "Favorites", Content = itemName .. " removed from favorites.", Duration = 3 })
+                                                                    removed = true
+                                                                    break
+                                                                end
+                                                            end
+                                                            if not removed then
+                                                                WindUI:Notify({ Title = "Favorites", Content = itemName .. " is not in favorites.", Duration = 3 })
+                                                            end
+                                                        end)
+                                                    end
+                                                end
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+
+                            local infoBG = shop.Holder:FindFirstChild("InfoBG")
+                            if infoBG then
+                                local targetBtn = infoBG:FindFirstChild("BuyButton") or infoBG:FindFirstChild("EquipButton")
+
+                                if not targetBtn then
+                                    for _, child in ipairs(infoBG:GetChildren()) do
+                                        if (child:IsA("TextButton") or child:IsA("ImageButton")) and not child.Name:lower():find("close") then
+                                            targetBtn = child
+                                            break
+                                        end
+                                    end
+                                end
+
+                                if targetBtn then
+                                    local function getSelectedShopItemName()
+                                        local clickedItem = getgenv()._lhxCurrentInfoItem or ""
+                                        local clickedKind = getgenv()._lhxCurrentInfoKind or ""
+                                        local activeKind = getgenv()._lhxCurrentShopKind or ""
+                                        if activeKind ~= "" and clickedKind ~= "" and clickedKind ~= activeKind then return "" end
+                                        if clickedItem == "" or clickedItem == "Title" then return "" end
+                                        local itemName = clickedItem
+                                        pcall(function()
+                                            local ibg = shop.Holder and shop.Holder:FindFirstChild("InfoBG")
+                                            local namer = ibg and ibg:FindFirstChild("Namer")
+                                            if namer and namer:IsA("TextLabel") and namer.Text ~= "" and namer.Text ~= "Title" then
+                                                itemName = namer.Text
+                                            end
+                                        end)
+                                        return itemName
+                                    end
+                                    local selectedShopItem = getSelectedShopItemName()
+                                    local hasSelectedShopItem = selectedShopItem ~= ""
+                                    targetBtn.Visible = hasSelectedShopItem
+                                    if targetBtn:IsA("GuiButton") then targetBtn.Active = hasSelectedShopItem end
+
+                                    local forcedEquip = getgenv()._lhxShopForcedEquip
+                                    local namerNow = ""
+                                    pcall(function()
+                                        local ibgN = shop.Holder:FindFirstChild("InfoBG")
+                                        local nmr = ibgN and ibgN:FindFirstChild("Namer")
+                                        if nmr and nmr:IsA("TextLabel") then namerNow = nmr.Text end
+                                    end)
+                                    local activeKindForButton = "Sword"
+                                    do
+                                        local okS2, isS2 = pcall(function()
+                                            local m = require(game:GetService("ReplicatedStorage").Shared.ReplicatedInstances.Swords)
+                                            return m:GetSword(namerNow) ~= nil
+                                        end)
+                                        if not (okS2 and isS2) then activeKindForButton = "Explosion" end
+                                    end
+                                    if hasSelectedShopItem and forcedEquip
+                                        and forcedEquip.Until
+                                        and os.clock() < forcedEquip.Until
+                                        and forcedEquip.Kind == activeKindForButton then
+                                        getgenv().setLeviHubShopButtonText(targetBtn, "Equipped")
+                                    else
+                                        local txt = targetBtn:FindFirstChildOfClass("TextLabel")
+                                        if txt and txt.Text ~= "Equip" and txt.Text ~= "Equipped" then txt.Text = "Equip" end
+                                        if targetBtn:IsA("TextButton") and targetBtn.Text ~= "Equip" and targetBtn.Text ~= "Equipped" then targetBtn.Text = "Equip" end
+                                    end
+
+                                    local globalFav = shop.Holder:FindFirstChild("Favorite", true) or shop:FindFirstChild("Favorite", true)
+                                    local infoBG_forDel = shop.Holder:FindFirstChild("InfoBG")
+                                    local globalDel = infoBG_forDel and infoBG_forDel:FindFirstChild("Delete") or shop.Holder:FindFirstChild("Delete", true)
+                                    
+                                    if globalFav then
+                                        globalFav.Visible = hasSelectedShopItem
+                                        if globalFav:IsA("GuiButton") then globalFav.Active = hasSelectedShopItem end
+                                    end
+                                    if globalDel then
+                                        globalDel.Visible = hasSelectedShopItem
+                                        if globalDel:IsA("GuiButton") then globalDel.Active = hasSelectedShopItem end
+                                    end
+
+                                    if not targetBtn:FindFirstChild("SkinChangerHookedV2") then
+                                         local hookTag = Instance.new("BoolValue", targetBtn)
+                                         hookTag.Name = "SkinChangerHookedV2"                                         
+                                         local globalFav = shop.Holder:FindFirstChild("Favorite", true) or shop:FindFirstChild("Favorite", true)
+                                         local infoBG_forDel = shop.Holder:FindFirstChild("InfoBG")
+                                         local globalDel = infoBG_forDel and infoBG_forDel:FindFirstChild("Delete") or shop.Holder:FindFirstChild("Delete", true)
+
+                                         local function getInfoItemName()
+                                    local clickedItem = getgenv()._lhxCurrentInfoItem or ""
+                                    local clickedKind = getgenv()._lhxCurrentInfoKind or ""
+                                    local activeKind = getgenv()._lhxCurrentShopKind or ""
+                                    if activeKind ~= "" and clickedKind ~= "" and clickedKind ~= activeKind then return "" end
+                                    if clickedItem == "" or clickedItem == "Title" then return "" end
+                                    local nm = clickedItem
+                                    pcall(function()
+                                        local ibg = shop.Holder:FindFirstChild("InfoBG")
+                                        local namer = ibg and ibg:FindFirstChild("Namer")
+                                        if namer and namer:IsA("TextLabel") and namer.Text ~= "" and namer.Text ~= "Title" then nm = namer.Text end
+                                    end)
+                                    return nm
+                                         end
+
+                                         if globalFav and not globalFav:FindFirstChild("LeviHubFavHooked") then
+                                             local favTag = Instance.new("BoolValue", globalFav)
+                                             favTag.Name = "LeviHubFavHooked"
+                                             globalFav.MouseButton1Click:Connect(function()
+                                                 local itemName = getInfoItemName()
+                                                 if itemName ~= "" and itemName ~= "Title" then
+                                                     local found = false
+                                                     for i, s in ipairs(favoriteSwords) do
+                                                         if s == itemName then
+                                                             table.remove(favoriteSwords, i)
+                                                             found = true
+                                                             WindUI:Notify({ Title = "Favorites", Content = itemName .. " removed from favorites.", Duration = 3 })
+                                                             break
+                                                         end
+                                                     end
+                                                     if not found then
+                                                         table.insert(favoriteSwords, itemName)
+                                                         WindUI:Notify({ Title = "Favorites", Content = itemName .. " added to favorites.", Duration = 3 })
+                                                     end
+                                                     pcall(function() saveFavs() end)
+                                                     pcall(function() refreshFavList() end)
+                                                 end
+                                             end)
+                                         end
+
+                                         if globalDel and not globalDel:FindFirstChild("LeviHubDelHooked") then
+                                             local delTag = Instance.new("BoolValue", globalDel)
+                                             delTag.Name = "LeviHubDelHooked"
+                                             globalDel.MouseButton1Click:Connect(function()
+                                                 local itemName = getInfoItemName()
+                                                 if itemName ~= "" and itemName ~= "Title" then
+                                                     local removed = false
+                                                     for i, s in ipairs(favoriteSwords) do
+                                                         if s == itemName then
+                                                             table.remove(favoriteSwords, i)
+                                                             removed = true
+                                                             WindUI:Notify({ Title = "Favorites", Content = itemName .. " deleted from favorites.", Duration = 3 })
+                                                             break
+                                                         end
+                                                     end
+                                                     if not removed then
+                                                         WindUI:Notify({ Title = "Favorites", Content = itemName .. " is not in favorites.", Duration = 3 })
+                                                     end
+                                                     pcall(function() saveFavs() end)
+                                                     pcall(function() refreshFavList() end)
+                                                 end
+                                             end)
+                                         end
+
+                                         targetBtn.MouseButton1Click:Connect(function()
+                                    local activeKind = "Sword"
+                                    do
+                                        local nmK = ""
+                                        pcall(function()
+                                            local ibgK = shop.Holder:FindFirstChild("InfoBG")
+                                            local nmr = ibgK and ibgK:FindFirstChild("Namer")
+                                            if nmr and nmr:IsA("TextLabel") then nmK = nmr.Text end
+                                        end)
+                                        if nmK == "" then nmK = getgenv()._lhxCurrentInfoItem or "" end
+                                        local okS, isS = pcall(function()
+                                            local m = require(game:GetService("ReplicatedStorage").Shared.ReplicatedInstances.Swords)
+                                            return m:GetSword(nmK) ~= nil
+                                        end)
+                                        if not (okS and isS) then activeKind = "Explosion" end
+                                    end
+
+                                            local infoBG = shop.Holder:FindFirstChild("InfoBG")
+                                            if not infoBG then
+                                                return
+                                            end
+
+                                             local itemName = getInfoItemName()
+
+                                             if itemName == "" or itemName == "Title" then return end
+
+                                             if itemName ~= "" and itemName ~= "Title" then
+                                                 getgenv().forceLeviHubShopEquippedText(shop, targetBtn, activeKind, itemName)
+
+                                                if activeKind == "Explosion" then
+                                                    getgenv().explosionFX = itemName
+                                                    getgenv().explosionChanger = true
+                                                    if getgenv().setExplosionChangerToggleUI then getgenv().setExplosionChangerToggleUI(true) end
+                                                    if getgenv().setExplosionInputUI then getgenv().setExplosionInputUI(itemName) end
+                                                    getgenv().setExplosionApplyText("Equipped")
+                                                    if getgenv().updateExplosion then
+                                                        task.spawn(function()
+                                                            getgenv().updateExplosion()
+                                                        end)
+                                                    end
+                                                else
+                                                    getgenv().swordModel = itemName
+                                                    getgenv().swordAnimations = itemName
+                                                    getgenv().swordFX = itemName
+                                                    getgenv().skinChanger = true
+
+                                                    if getgenv().setSkinChangerToggleUI then getgenv().setSkinChangerToggleUI(true) end
+                                                    if skinSwordInput and skinSwordInput.Set then skinSwordInput:Set(itemName) end
+                                                    if getgenv().updateSword then getgenv().updateSword() end
+                                                end
+
+                                                getgenv().forceLeviHubShopEquippedText(shop, targetBtn, activeKind, itemName)
+                                            end
+                                        end)
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    WindUI:Notify({ Title = "Skin Changer", Content = "Unlocked swords and explosions locally!", Duration = 3 })
+                else
+                    WindUI:Notify({ Title = "Skin Changer", Content = "Already unlocked!", Duration = 3 })
+                end
+            end,
+        })
+
+    end
+
+
 
     local SKIN_LAST_EQUIPPED_CONFIG_KEY = "Skin.LastEquippedSword"
     local EXPLOSION_LAST_EQUIPPED_CONFIG_KEY = "Skin.LastEquippedExplosion"
-    local FINISHER_LAST_EQUIPPED_CONFIG_KEY = "Skin.LastEquippedFinisher"
     local AUTO_CONFIG_FILE = "LeviHubX/auto_config.json"
 
     local function readLeviHubAutoConfig()
@@ -95,12 +458,6 @@ if not reuseExistingBackend then
         return type(saved) == "string" and saved or ""
     end
 
-    local function loadLastEquippedFinisher()
-        local data = readLeviHubAutoConfig()
-        local saved = data[FINISHER_LAST_EQUIPPED_CONFIG_KEY]
-        return type(saved) == "string" and saved or ""
-    end
-
     getgenv().saveLastEquippedSword = function(swordName)
         if type(swordName) ~= "string" or swordName == "" then return end
 
@@ -133,33 +490,18 @@ if not reuseExistingBackend then
         writeLeviHubAutoConfig(data)
     end
 
-    getgenv().saveLastEquippedFinisher = function(finisherName)
-        if type(finisherName) ~= "string" or finisherName == "" then return end
 
-        local autoConfig = getgenv()._lhxAutoConfig
-        local data = autoConfig and autoConfig.Data
-        if type(data) ~= "table" then
-            data = readLeviHubAutoConfig()
-        end
 
-        data[FINISHER_LAST_EQUIPPED_CONFIG_KEY] = finisherName
-        if autoConfig and type(autoConfig.Data) == "table" then
-            autoConfig.Data[FINISHER_LAST_EQUIPPED_CONFIG_KEY] = finisherName
-        end
-        writeLeviHubAutoConfig(data)
+    do
+        local savedLastSword = loadLastEquippedSword()
+        local savedLastExplosion = loadLastEquippedExplosion()
+        getgenv().skinChanger = getgenv().skinChanger or savedLastSword ~= ""
+        getgenv().swordModel = type(getgenv().swordModel) == "string" and getgenv().swordModel ~= "" and getgenv().swordModel or savedLastSword
+        getgenv().swordAnimations = type(getgenv().swordAnimations) == "string" and getgenv().swordAnimations ~= "" and getgenv().swordAnimations or savedLastSword
+        getgenv().swordFX = type(getgenv().swordFX) == "string" and getgenv().swordFX ~= "" and getgenv().swordFX or savedLastSword
+        getgenv().explosionChanger = getgenv().explosionChanger or savedLastExplosion ~= ""
+        getgenv().explosionFX = type(getgenv().explosionFX) == "string" and getgenv().explosionFX ~= "" and getgenv().explosionFX or savedLastExplosion
     end
-
-    local savedLastSword = loadLastEquippedSword()
-    local savedLastExplosion = loadLastEquippedExplosion()
-    local savedLastFinisher = loadLastEquippedFinisher()
-    getgenv().skinChanger = getgenv().skinChanger or savedLastSword ~= ""
-    getgenv().swordModel = type(getgenv().swordModel) == "string" and getgenv().swordModel ~= "" and getgenv().swordModel or savedLastSword
-    getgenv().swordAnimations = type(getgenv().swordAnimations) == "string" and getgenv().swordAnimations ~= "" and getgenv().swordAnimations or savedLastSword
-    getgenv().swordFX = type(getgenv().swordFX) == "string" and getgenv().swordFX ~= "" and getgenv().swordFX or savedLastSword
-    getgenv().explosionChanger = getgenv().explosionChanger or savedLastExplosion ~= ""
-    getgenv().explosionFX = type(getgenv().explosionFX) == "string" and getgenv().explosionFX ~= "" and getgenv().explosionFX or savedLastExplosion
-    getgenv().finisherChanger = getgenv().finisherChanger or savedLastFinisher ~= ""
-    getgenv().finisherModel = type(getgenv().finisherModel) == "string" and getgenv().finisherModel ~= "" and getgenv().finisherModel or savedLastFinisher
 
     task.spawn(function()
         local rs = game:GetService("ReplicatedStorage")
@@ -220,7 +562,7 @@ if not reuseExistingBackend then
             task.spawn(function()
                 local attempts = 0
                 while not swordsController and attempts < 20 do
-                    task.wait(0.5); attempts += 1
+                    task.wait(0.5); attempts = attempts + 1
                 end
                 if not swordsController then return end
                 pcall(function()
@@ -255,7 +597,7 @@ if not reuseExistingBackend then
                             for _, v in ipairs(conns) do
                                 local func = v.Function
                                 if func and not hookedFuncs[func] then
-
+                                    
                                     hookedFuncs[func] = true
                                     v:Disable()
                                     local targetFunc = func
@@ -337,7 +679,7 @@ if not reuseExistingBackend then
                         if not char:FindFirstChild(getgenv().swordModel) then
                             setSword()
                         end
-                        for _, v in char:GetChildren() do
+                        for _, v in pairs(char:GetChildren()) do
                             if v:IsA("Model") and v.Name ~= getgenv().swordModel then
                                 v:Destroy()
                             end
@@ -361,40 +703,12 @@ if not reuseExistingBackend then
         end)
     end)
 
+
     task.spawn(function()
         local rs = game:GetService("ReplicatedStorage")
-
-        task.spawn(function()
-            local hookFunction = getExecutorGlobal("hookfunction") or getExecutorGlobal("hookfunc")
-            if type(hookFunction) ~= "function" then return end
-            local controllers = rs:WaitForChild("Controllers", 10)
-            if not controllers then return end
-            local fcModule = controllers:WaitForChild("FinishersController", 10)
-            if not fcModule then return end
-            local ok, module = pcall(require, fcModule)
-            if ok and type(module) == "table" then
-                getgenv()._lhxFCModule = module
-                for k, v in pairs(module) do
-                    if type(v) == "function" then
-                        local orig
-                        orig = hookFunction(v, function(self, ...)
-                            if getgenv().finisherModel and getgenv().finisherModel ~= "" then
-                                local newArgs = { ... }
-                                if type(newArgs[1]) == "string" then
-                                    newArgs[1] = getgenv().finisherModel
-                                elseif type(newArgs[2]) == "string" then
-                                    newArgs[2] = getgenv().finisherModel
-                                end
-                                return orig(self, unpack(newArgs))
-                            end
-                            return orig(self, ...)
-                        end)
-                    end
-                end
-            end
-        end)
-
         local explosionHookedFuncs = {}
+        
+
         local explosionDirectHooked = {}
         local deadFolderHooked = false
         local explosionModule = nil
@@ -521,7 +835,7 @@ if not reuseExistingBackend then
                 for _, object in ipairs(config:GetDescendants()) do
                     if object:IsA("StringValue") then
                         add(object.Value)
-                        scanned += 1
+                        scanned = scanned + 1
                         if scanned >= 20 then break end
                     end
                 end
@@ -671,10 +985,10 @@ if not reuseExistingBackend then
                         if wanted:find(key, 1, true) or key:find(wanted, 1, true) then
                             score = math.max(score, math.min(#key, #wanted))
                         else
-                            for word in tostring(alias):gmatch("[%w]+") do
+                            for word in pairs(tostring(alias):gmatch("[%w]+")) do
                                 local wordKey = normalizeExplosionName(word)
                                 if #wordKey >= 4 and key:find(wordKey, 1, true) then
-                                    score += #wordKey
+                                    score = score + #wordKey
                                 end
                             end
                         end
@@ -1080,6 +1394,8 @@ if not reuseExistingBackend then
             return true
         end
 
+
+
         local function playLocalExplosion(position)
             if not getgenv().explosionChanger then return false end
             local selectedExplosion = getSelectedExplosionName()
@@ -1292,7 +1608,7 @@ if not reuseExistingBackend then
                     if isLocalKillStatName(stat.Name) then
                         local value = numericStatValue(stat)
                         if value then
-                            total += value
+                            total = total + value
                             found = true
                         end
                     end
@@ -1302,7 +1618,7 @@ if not reuseExistingBackend then
                 local attributeValue = LocalPlayer:GetAttribute(attributeName)
                 local value = numericStatValue(attributeValue)
                 if value then
-                    total += value
+                    total = total + value
                     found = true
                 end
             end
@@ -1642,7 +1958,7 @@ if not reuseExistingBackend then
                     local creator = character:FindFirstChild("creator", true) or character:FindFirstChild("Creator", true)
                     local characterPlayer = Players:GetPlayerFromCharacter(character)
                         or Players:FindFirstChild(tostring(character and character.Name or ""))
-
+                    
                     local isLocalKill = false
                     if creator and (creator.Value == LocalPlayer or creator.Value == LocalPlayer.Name) then
                         isLocalKill = true
@@ -1653,7 +1969,7 @@ if not reuseExistingBackend then
                     else
                         queueKillExplosion(root.Position)
                     end
-
+                    
                     if isLocalKill and getgenv().finisherModel and getgenv().finisherModel ~= "" and getgenv()._lhxFCModule then
                         if not characterPlayer then
                             task.spawn(function()
@@ -1751,693 +2067,3 @@ if not reuseExistingBackend then
                     end
                 end
             end
-        end
-    end)
-end
-
-do
-    local FAVORITES_FILE = "LeviHubX/fav_swords.json"
-    local favoriteSwords = {}
-
-    local function loadFavs()
-        table.clear(favoriteSwords)
-        pcall(function()
-            if isfile and readfile and isfile(FAVORITES_FILE) then
-                local decoded = HttpService:JSONDecode(readfile(FAVORITES_FILE))
-                if type(decoded) == "table" then
-                    for _, swordName in ipairs(decoded) do
-                        if type(swordName) == "string" and swordName ~= "" then
-                            table.insert(favoriteSwords, swordName)
-                        end
-                    end
-                end
-            end
-        end)
-    end
-
-    local function saveFavs()
-        pcall(function()
-            if isfolder and makefolder and not isfolder("LeviHubX") then
-                makefolder("LeviHubX")
-            end
-            if writefile then
-                writefile(FAVORITES_FILE, HttpService:JSONEncode(favoriteSwords))
-            end
-        end)
-    end
-
-    local function refreshFavList() end
-
-    loadFavs()
-
-    G.setLeviHubShopButtonText = function(button, text)
-        if not button then return end
-        for _, textObject in ipairs(button:GetDescendants()) do
-            if textObject:IsA("TextLabel")
-                or textObject:IsA("TextButton")
-                or textObject:IsA("TextBox") then
-                textObject.Text = text
-            end
-        end
-        if button:IsA("TextButton") then
-            button.Text = text
-        end
-    end
-
-    G.forceLeviHubShopEquippedText = function(shop, button, kind, itemName)
-        G._lhxShopForcedEquip = {
-            Button = button,
-            Kind = kind,
-            Name = itemName,
-            Until = os.clock() + 2.5,
-        }
-
-        local function applyOnce()
-            local targetButton = button
-            if (not targetButton or not targetButton.Parent) and shop and shop:FindFirstChild("Holder") then
-                local infoBG = shop.Holder:FindFirstChild("InfoBG")
-                targetButton = infoBG and (infoBG:FindFirstChild("BuyButton") or infoBG:FindFirstChild("EquipButton"))
-                if not targetButton and infoBG then
-                    for _, child in ipairs(infoBG:GetChildren()) do
-                        if (child:IsA("TextButton") or child:IsA("ImageButton")) and not child.Name:lower():find("close") then
-                            targetButton = child
-                            break
-                        end
-                    end
-                end
-            end
-            G.setLeviHubShopButtonText(targetButton, "Equipped")
-        end
-
-        applyOnce()
-        task.spawn(function()
-            while G._lhxShopForcedEquip and os.clock() < G._lhxShopForcedEquip.Until do
-                applyOnce()
-                task.wait(0.05)
-            end
-        end)
-    end
-
-    local function getSelectedShopItemName(infoBG, activePage)
-        if not infoBG then return "" end
-
-        local itemName = ""
-        local bestY = math.huge
-        local bestX = math.huge
-
-        local function scoreTextLabel(label)
-            if not label or not label:IsA("TextLabel") and not label:IsA("TextButton") and not label:IsA("TextBox") then
-                return
-            end
-            if label.Visible == false then return end
-
-            local text = tostring(label.Text or ""):gsub("<[^>]+>", "")
-            text = text:gsub("^%s+", ""):gsub("%s+$", "")
-            local cleanText = text:gsub(",", ""):gsub(" ", "")
-            local lowered = text:lower()
-            local isNumber = tonumber(cleanText) ~= nil
-
-            if text == "" or text == "Title" or text == "Equip" or text == "Equipped" or text == "Buy" then return end
-            if lowered == "sword" or lowered == "swords"
-                or lowered == "explosion" or lowered == "explosions"
-                or lowered == "skin" or lowered == "skins"
-                or lowered == "shop" or lowered == "owned (unlocked)" then return end
-            if isNumber or lowered:find("coins", 1, true) or lowered:find("owned", 1, true) then return end
-            if #text < 4 or #text > 40 then return end
-
-            local pos = label.AbsolutePosition
-            local yPos = pos and pos.Y or math.huge
-            local xPos = pos and pos.X or math.huge
-            if yPos < bestY or (yPos == bestY and xPos < bestX) then
-                bestY = yPos
-                bestX = xPos
-                itemName = text
-            end
-        end
-
-        local function scan(parent)
-            for _, child in ipairs(parent:GetChildren()) do
-                scoreTextLabel(child)
-                scan(child)
-            end
-        end
-
-        local titleLabel = infoBG:FindFirstChild("Title", true)
-            or infoBG:FindFirstChild("ItemName", true)
-            or infoBG:FindFirstChild("Name", true)
-            or infoBG:FindFirstChild("SwordName", true)
-            or infoBG:FindFirstChild("ExplosionName", true)
-            or infoBG:FindFirstChild("HeaderTitle", true)
-        scoreTextLabel(titleLabel)
-        scan(infoBG)
-        if itemName == "" and activePage then
-            scan(activePage)
-        end
-
-        return itemName
-    end
-
-    local function maintainShop(shop)
-        local holder = shop and shop:FindFirstChild("Holder")
-        if not holder then return end
-
-        local pages = holder:FindFirstChild("Pages")
-        for _, pageName in ipairs({"Sword", "Explosion"}) do
-            local page = pages and pages:FindFirstChild(pageName)
-            if page then
-                local unownedHeader = page:FindFirstChild("HeaderTitle")
-                if unownedHeader then
-                    unownedHeader.Visible = false
-                end
-
-                for _, child in ipairs(page:GetDescendants()) do
-                    if child.Name == "Lock" and child:IsA("GuiObject") then
-                        child.Visible = false
-                        local itemCard = child.Parent
-                        if itemCard and itemCard:IsA("GuiObject") then
-                            itemCard.LayoutOrder = 0
-                            if itemCard.Parent and itemCard.Parent.Name == "Unowned" then
-                                local ownedContainer = page:FindFirstChild("Owned", true)
-                                if ownedContainer and ownedContainer:IsA("GuiObject") then
-                                    itemCard.Parent = ownedContainer
-                                end
-                            end
-
-                            local favBtn = itemCard:FindFirstChild("Favorite", true) or itemCard:FindFirstChild("Star", true)
-                            local delBtn = itemCard:FindFirstChild("Delete", true) or itemCard:FindFirstChild("Trash", true)
-
-                            if favBtn and favBtn:IsA("GuiObject") then favBtn.Visible = true end
-                            if delBtn and delBtn:IsA("GuiObject") then delBtn.Visible = true end
-
-                            if not itemCard:FindFirstChild("LeviHubHooked") then
-                                local tag = Instance.new("BoolValue", itemCard)
-                                tag.Name = "LeviHubHooked"
-
-                                local itemName = itemCard.Name
-                                local titleObj = itemCard:FindFirstChild("Title", true)
-                                    or itemCard:FindFirstChild("ItemName", true)
-                                    or itemCard:FindFirstChild("Name", true)
-                                if titleObj and titleObj:IsA("TextLabel") then itemName = titleObj.Text end
-
-                                if favBtn and (favBtn:IsA("GuiButton") or favBtn:IsA("ImageButton") or favBtn:IsA("TextButton")) then
-                                    favBtn.MouseButton1Click:Connect(function()
-                                        local found = false
-                                        for _, swordName in ipairs(favoriteSwords) do
-                                            if swordName == itemName then
-                                                found = true
-                                                break
-                                            end
-                                        end
-                                        if not found then
-                                            table.insert(favoriteSwords, itemName)
-                                            pcall(function() saveFavs() end)
-                                            pcall(function() refreshFavList() end)
-                                        end
-                                    end)
-                                end
-
-                                if delBtn and (delBtn:IsA("GuiButton") or delBtn:IsA("ImageButton") or delBtn:IsA("TextButton")) then
-                                    delBtn.MouseButton1Click:Connect(function()
-                                        for index, swordName in ipairs(favoriteSwords) do
-                                            if swordName == itemName then
-                                                table.remove(favoriteSwords, index)
-                                                pcall(function() saveFavs() end)
-                                                pcall(function() refreshFavList() end)
-                                                break
-                                            end
-                                        end
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
-
-        local infoBG = holder:FindFirstChild("InfoBG")
-        if not infoBG then return end
-
-        local oldEquips = infoBG:FindFirstChild("Equips")
-        local oldFinisherButton = (oldEquips and oldEquips:FindFirstChild("Finisher"))
-            or infoBG:FindFirstChild("Finisher")
-        if oldFinisherButton and oldFinisherButton:FindFirstChild("LeviUnlockAllFinisherHooked") then
-            oldFinisherButton.Visible = false
-        end
-
-        local targetBtn = infoBG:FindFirstChild("BuyButton") or infoBG:FindFirstChild("EquipButton")
-
-        if not targetBtn then
-            for _, child in ipairs(infoBG:GetChildren()) do
-                if (child:IsA("TextButton") or child:IsA("ImageButton")) and not child.Name:lower():find("close") then
-                    targetBtn = child
-                    break
-                end
-            end
-        end
-
-        if targetBtn then
-            targetBtn.Visible = true
-
-            if not targetBtn:FindFirstChild("LeviUnlockAllAlwaysVisible") then
-                local visibleTag = Instance.new("BoolValue", targetBtn)
-                visibleTag.Name = "LeviUnlockAllAlwaysVisible"
-                targetBtn:GetPropertyChangedSignal("Visible"):Connect(function()
-                    if G._lhxStandaloneUnlockAllLoaded and targetBtn.Parent and not targetBtn.Visible then
-                        targetBtn.Visible = true
-                    end
-                end)
-            end
-
-            local currentPages = holder:FindFirstChild("Pages")
-            local swordPage = currentPages and currentPages:FindFirstChild("Sword")
-            local explosionPage = currentPages and currentPages:FindFirstChild("Explosion")
-            local activeSkinPage = (swordPage and swordPage.Visible and swordPage)
-                or (explosionPage and explosionPage.Visible and explosionPage)
-
-            if not activeSkinPage then
-                G._lhxShopForcedEquip = nil
-                G.setLeviHubShopButtonText(targetBtn, "Equip")
-                return
-            end
-
-            local activeKindForButton = activeSkinPage == explosionPage and "Explosion" or "Sword"
-            local selectedItemName = getSelectedShopItemName(infoBG, activeSkinPage)
-            local itemIsEquipped = false
-
-            if activeKindForButton == "Sword" then
-                itemIsEquipped = G._lhxSwordEquipSource == "Shop"
-                    and selectedItemName ~= ""
-                    and G._lhxEquippedShopSword == selectedItemName
-            else
-                itemIsEquipped = G._lhxExplosionEquipSource == "Shop"
-                    and selectedItemName ~= ""
-                    and G._lhxEquippedShopExplosion == selectedItemName
-            end
-
-            local forcedEquip = G._lhxShopForcedEquip
-            local forcedMatches = forcedEquip
-                and forcedEquip.Until
-                and os.clock() < forcedEquip.Until
-                and forcedEquip.Kind == activeKindForButton
-                and forcedEquip.Name == selectedItemName
-                and itemIsEquipped
-
-            if forcedEquip and not forcedMatches then
-                G._lhxShopForcedEquip = nil
-            end
-
-            G.setLeviHubShopButtonText(targetBtn, (itemIsEquipped or forcedMatches) and "Equipped" or "Equip")
-
-            if not targetBtn:FindFirstChild("LeviUnlockAllEquipStateHooked") then
-                local hookTag = Instance.new("BoolValue", targetBtn)
-                hookTag.Name = "LeviUnlockAllEquipStateHooked"
-
-                targetBtn.MouseButton1Click:Connect(function()
-                    local livePages = shop.Holder and shop.Holder:FindFirstChild("Pages")
-                    local liveSwordPage = livePages and livePages:FindFirstChild("Sword")
-                    local liveExplosionPage = livePages and livePages:FindFirstChild("Explosion")
-                    local activePage = (liveSwordPage and liveSwordPage.Visible and liveSwordPage)
-                        or (liveExplosionPage and liveExplosionPage.Visible and liveExplosionPage)
-                    local activeKind = activePage == liveExplosionPage and "Explosion" or "Sword"
-                    if not activePage then
-                        return
-                    end
-
-                    local liveInfoBG = shop.Holder:FindFirstChild("InfoBG")
-                    if not liveInfoBG then
-                        return
-                    end
-
-                    local itemName = ""
-                    local bestY = math.huge
-                    local bestX = math.huge
-
-                    local function scoreTextLabel(label)
-                        if not label or not label:IsA("TextLabel") and not label:IsA("TextButton") and not label:IsA("TextBox") then
-                            return
-                        end
-                        if label.Visible == false then return end
-
-                        local text = tostring(label.Text or ""):gsub("<[^>]+>", "")
-                        text = text:gsub("^%s+", ""):gsub("%s+$", "")
-                        local cleanText = text:gsub(",", ""):gsub(" ", "")
-                        local lowered = text:lower()
-                        local isNumber = tonumber(cleanText) ~= nil
-
-                        if text == "" or text == "Title" or text == "Equip" or text == "Equipped" or text == "Buy" then return end
-                        if lowered == "sword" or lowered == "swords"
-                            or lowered == "explosion" or lowered == "explosions"
-                            or lowered == "skin" or lowered == "skins"
-                            or lowered == "shop" or lowered == "owned (unlocked)" then return end
-                        if isNumber or lowered:find("coins", 1, true) or lowered:find("owned", 1, true) then return end
-                        if #text < 4 or #text > 40 then return end
-
-                        local pos = label.AbsolutePosition
-                        local yPos = pos and pos.Y or math.huge
-                        local xPos = pos and pos.X or math.huge
-                        if yPos < bestY or (yPos == bestY and xPos < bestX) then
-                            bestY = yPos
-                            bestX = xPos
-                            itemName = text
-                        end
-                    end
-
-                    local function scan(parent)
-                        for _, child in ipairs(parent:GetChildren()) do
-                            scoreTextLabel(child)
-                            scan(child)
-                        end
-                    end
-
-                    local titleLabel = liveInfoBG:FindFirstChild("Title", true)
-                        or liveInfoBG:FindFirstChild("ItemName", true)
-                        or liveInfoBG:FindFirstChild("Name", true)
-                        or liveInfoBG:FindFirstChild("SwordName", true)
-                        or liveInfoBG:FindFirstChild("ExplosionName", true)
-                        or liveInfoBG:FindFirstChild("HeaderTitle", true)
-                    scoreTextLabel(titleLabel)
-                    scan(liveInfoBG)
-                    if itemName == "" then
-                        scan(activePage)
-                    end
-
-                    if itemName ~= "" and itemName ~= "Title" then
-                        if activeKind == "Explosion" then
-                            G._lhxExplosionEquipSource = "Shop"
-                            G._lhxEquippedShopExplosion = itemName
-                        else
-                            G._lhxSwordEquipSource = "Shop"
-                            G._lhxEquippedShopSword = itemName
-                        end
-
-                        G.forceLeviHubShopEquippedText(shop, targetBtn, activeKind, itemName)
-
-                        if activeKind == "Explosion" then
-                            G.explosionFX = itemName
-                            G.explosionChanger = true
-                            if G.setExplosionChangerToggleUI then G.setExplosionChangerToggleUI(true) end
-                            if G.setExplosionInputUI then G.setExplosionInputUI(itemName) end
-                            G.setExplosionApplyText("Equipped")
-                            if G.updateExplosion then
-                                task.spawn(function()
-                                    G.updateExplosion()
-                                end)
-                            end
-                        else
-                            G.swordModel = itemName
-                            G.swordAnimations = itemName
-                            G.swordFX = itemName
-                            G.skinChanger = true
-
-                            if G.setSkinChangerToggleUI then G.setSkinChangerToggleUI(true) end
-                            if G.updateSword then G.updateSword() end
-                        end
-
-                        G.forceLeviHubShopEquippedText(shop, targetBtn, activeKind, itemName)
-                    end
-                end)
-            end
-        end
-
-    end
-
-    G.skinChanger = true
-    G.explosionChanger = true
-    G.unlockAllHooked = true
-
-    task.spawn(function()
-        local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-        local announced = false
-        while G._lhxStandaloneUnlockAllLoaded do
-            local shop = playerGui:FindFirstChild("Shop")
-            if shop then
-                local ok, err = pcall(maintainShop, shop)
-                if not ok then warn("[Unlock All] Shop update failed: " .. tostring(err)) end
-                if not announced then
-                    announced = true
-                    print("[Unlock All] Ready. Open the normal Shop and use Equip on any sword or explosion.")
-                end
-            end
-            task.wait(0.15)
-        end
-    end)
-end
-
-do
-    local UserInputService = game:GetService("UserInputService")
-    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
-
-    local previousGui = playerGui:FindFirstChild("LeviUnlockSwordMiniGui")
-    if previousGui then previousGui:Destroy() end
-
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "LeviUnlockSwordMiniGui"
-    screenGui.ResetOnSpawn = false
-    screenGui.IgnoreGuiInset = false
-    screenGui.DisplayOrder = 999
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.Parent = playerGui
-
-    local panel = Instance.new("Frame")
-    panel.Name = "SwordInputPanel"
-    panel.AnchorPoint = Vector2.new(0, 0.5)
-    panel.Position = UDim2.new(0, 64, 0.62, 0)
-    panel.Size = UDim2.fromOffset(240, 90)
-    panel.BackgroundColor3 = Color3.fromRGB(18, 20, 27)
-    panel.BackgroundTransparency = 0.06
-    panel.BorderSizePixel = 0
-    panel.Active = true
-    panel.Draggable = true
-    panel.Parent = screenGui
-
-    local panelCorner = Instance.new("UICorner")
-    panelCorner.CornerRadius = UDim.new(0, 10)
-    panelCorner.Parent = panel
-
-    local panelStroke = Instance.new("UIStroke")
-    panelStroke.Color = Color3.fromRGB(112, 95, 255)
-    panelStroke.Transparency = 0.25
-    panelStroke.Thickness = 1
-    panelStroke.Parent = panel
-
-    local panelScale = Instance.new("UIScale")
-    panelScale.Name = "ResponsiveScale"
-    panelScale.Parent = panel
-
-    local title = Instance.new("TextLabel")
-    title.Name = "Title"
-    title.Position = UDim2.fromOffset(10, 7)
-    title.Size = UDim2.new(1, -20, 0, 18)
-    title.BackgroundTransparency = 1
-    title.Font = Enum.Font.GothamSemibold
-    title.Text = "Sword model + animation + VFX"
-    title.TextColor3 = Color3.fromRGB(242, 242, 248)
-    title.TextSize = 12
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = panel
-
-    local textBox = Instance.new("TextBox")
-    textBox.Name = "SwordName"
-    textBox.Position = UDim2.fromOffset(10, 30)
-    textBox.Size = UDim2.new(1, -20, 0, 31)
-    textBox.BackgroundColor3 = Color3.fromRGB(31, 34, 44)
-    textBox.BorderSizePixel = 0
-    textBox.ClearTextOnFocus = false
-    textBox.Font = Enum.Font.GothamMedium
-    textBox.PlaceholderText = "Type sword name, then press Enter"
-    textBox.PlaceholderColor3 = Color3.fromRGB(142, 146, 160)
-    textBox.Text = ""
-    textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-    textBox.TextSize = 12
-    textBox.TextTruncate = Enum.TextTruncate.AtEnd
-    textBox.Parent = panel
-
-    local textCorner = Instance.new("UICorner")
-    textCorner.CornerRadius = UDim.new(0, 7)
-    textCorner.Parent = textBox
-
-    local textPadding = Instance.new("UIPadding")
-    textPadding.PaddingLeft = UDim.new(0, 9)
-    textPadding.PaddingRight = UDim.new(0, 9)
-    textPadding.Parent = textBox
-
-    local status = Instance.new("TextLabel")
-    status.Name = "Status"
-    status.Position = UDim2.fromOffset(10, 66)
-    status.Size = UDim2.new(1, -20, 0, 15)
-    status.BackgroundTransparency = 1
-    status.Font = Enum.Font.Gotham
-    status.Text = "Press Enter to apply — no button needed"
-    status.TextColor3 = Color3.fromRGB(166, 169, 182)
-    status.TextSize = 10
-    status.TextTruncate = Enum.TextTruncate.AtEnd
-    status.TextXAlignment = Enum.TextXAlignment.Left
-    status.Parent = panel
-
-    local toggleButton = Instance.new("TextButton")
-    toggleButton.Name = "MobileToggle"
-    toggleButton.AnchorPoint = Vector2.new(0, 0)
-    toggleButton.Position = UDim2.new(0, 12, 0.62, -21)
-    toggleButton.Size = UDim2.fromOffset(42, 42)
-    toggleButton.AutoButtonColor = true
-    toggleButton.BackgroundColor3 = Color3.fromRGB(104, 86, 255)
-    toggleButton.BorderSizePixel = 0
-    toggleButton.Font = Enum.Font.GothamBold
-    toggleButton.Text = "S"
-    toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    toggleButton.TextSize = 17
-    toggleButton.ZIndex = 5
-    toggleButton.Parent = screenGui
-
-    local toggleCorner = Instance.new("UICorner")
-    toggleCorner.CornerRadius = UDim.new(1, 0)
-    toggleCorner.Parent = toggleButton
-
-    local toggleStroke = Instance.new("UIStroke")
-    toggleStroke.Color = Color3.fromRGB(228, 224, 255)
-    toggleStroke.Transparency = 0.35
-    toggleStroke.Thickness = 1
-    toggleStroke.Parent = toggleButton
-
-    local toggleScale = Instance.new("UIScale")
-    toggleScale.Name = "ResponsiveScale"
-    toggleScale.Parent = toggleButton
-
-    local function updateScale()
-        local camera = workspace.CurrentCamera
-        local viewportWidth = camera and camera.ViewportSize.X or 1280
-        panelScale.Scale = math.clamp(viewportWidth / 1280, 0.72, 1)
-        toggleScale.Scale = math.clamp(viewportWidth / 900, 0.82, 1)
-    end
-
-    updateScale()
-    if workspace.CurrentCamera then
-        workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
-    end
-    workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-        updateScale()
-        local camera = workspace.CurrentCamera
-        if camera then
-            camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
-        end
-    end)
-
-    local toggleDragging = false
-    local toggleDragInput
-    local toggleDragStart
-    local toggleStartPosition
-    local toggleMoved = false
-
-    toggleButton.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-            or input.UserInputType == Enum.UserInputType.Touch then
-            toggleDragging = true
-            toggleMoved = false
-            toggleDragStart = input.Position
-            toggleStartPosition = toggleButton.AbsolutePosition
-
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    toggleDragging = false
-                end
-            end)
-        end
-    end)
-
-    toggleButton.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-            or input.UserInputType == Enum.UserInputType.Touch then
-            toggleDragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if not toggleDragging or input ~= toggleDragInput or not toggleDragStart or not toggleStartPosition then
-            return
-        end
-
-        local delta = input.Position - toggleDragStart
-        if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then
-            toggleMoved = true
-        end
-
-        local camera = workspace.CurrentCamera
-        local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
-        local width = toggleButton.AbsoluteSize.X
-        local height = toggleButton.AbsoluteSize.Y
-        local x = math.clamp(toggleStartPosition.X + delta.X, 4, math.max(4, viewport.X - width - 4))
-        local y = math.clamp(toggleStartPosition.Y + delta.Y, 4, math.max(4, viewport.Y - height - 4))
-        toggleButton.Position = UDim2.fromOffset(x, y)
-    end)
-
-    toggleButton.Activated:Connect(function()
-        if toggleMoved then
-            toggleMoved = false
-            return
-        end
-        panel.Visible = not panel.Visible
-        toggleButton.Text = panel.Visible and "S" or "+"
-    end)
-
-    local submissionId = 0
-    local function applySwordFromTextBox()
-        local swordName = tostring(textBox.Text or "")
-            :gsub("^%s+", "")
-            :gsub("%s+$", "")
-        if swordName == "" then
-            status.Text = "Enter a sword name first"
-            status.TextColor3 = Color3.fromRGB(255, 174, 174)
-            return
-        end
-
-        submissionId += 1
-        local thisSubmission = submissionId
-
-        G._lhxSwordEquipSource = "SwordGui"
-        G._lhxEquippedShopSword = nil
-        G._lhxShopForcedEquip = nil
-        G.swordModel = swordName
-        G.swordAnimations = swordName
-        G.swordFX = swordName
-        G.skinChanger = true
-        if G.setSkinChangerToggleUI then G.setSkinChangerToggleUI(true) end
-
-        status.Text = "Applying: " .. swordName
-        status.TextColor3 = Color3.fromRGB(205, 199, 255)
-
-        task.spawn(function()
-            for _ = 1, 100 do
-                if thisSubmission ~= submissionId then return end
-                if type(G.updateSword) == "function" then
-                    local ok = pcall(G.updateSword)
-                    if thisSubmission ~= submissionId then return end
-                    if ok then
-                        status.Text = "Applied: " .. swordName
-                        status.TextColor3 = Color3.fromRGB(155, 235, 184)
-                    else
-                        status.Text = "Could not apply that sword"
-                        status.TextColor3 = Color3.fromRGB(255, 174, 174)
-                    end
-                    return
-                end
-                task.wait(0.1)
-            end
-
-            if thisSubmission == submissionId then
-                status.Text = "Sword backend is not ready"
-                status.TextColor3 = Color3.fromRGB(255, 174, 174)
-            end
-        end)
-    end
-
-    textBox.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            applySwordFromTextBox()
-        end
-    end)
-
-    if UserInputService.TouchEnabled then
-        toggleButton.TextSize = 18
-    end
-end
