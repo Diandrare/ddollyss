@@ -1,6 +1,3 @@
--- Script corrigido para carregamento assíncrono da UI (FluentPlus)
--- O carregamento da biblioteca de UI é a principal causa do congelamento.
--- Envolver o script em task.spawn() permite que o jogo permaneça responsivo enquanto a UI carrega em segundo plano.
 task.spawn(function()
 --return Library
 
