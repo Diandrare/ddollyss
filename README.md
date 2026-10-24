@@ -24,7 +24,7 @@
   </a>
 </p>
 
-<!-- ═══════════════ VIEWS + FOLLOWERS + STAR ═══════════════ -->
+<!-- ═══════════════ VIEWS + FOLLOWERS + STATUS ═══════════════ -->
 <p align="center">
   <img src="https://komarev.com/ghpvc/?username=Diandrare&label=Profile%20Views&color=ff69b4&style=for-the-badge" />
   <img src="https://img.shields.io/github/followers/Diandrare?label=Followers&style=for-the-badge&color=ff69b4" />
@@ -33,8 +33,7 @@
 
 <!-- ═══════════════ ANIMATED CAT ═══════════════ -->
 <div align="center">
-    <img src="https://githubusercontent.com" width="180" alt="Bongo Neko">
-
+    <img src="https://raw.githubusercontent.com/Minitoke/Minitoke/main/cat-jump.gif" width="160" alt="Bongo Neko">
 </div>
 
 <!-- ═══════════════ DIVIDER ═══════════════ -->
@@ -61,7 +60,6 @@
 <p align="center">
   <img src="https://skillicons.dev/icons?i=js,ts,py,nodejs,html,css,figma,ps,pr,ae,blender,git,github,vscode,mongodb,mysql&perline=8" />
 </p>
-
 
 <!-- ═══════════════ DOOMESTIC ═══════════════ -->
 <h2 align="center">🌸 Doomestic</h2>
