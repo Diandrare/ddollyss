@@ -1,5 +1,4 @@
-
-        local exec = (identifyexecutor or function() return "" end)()
+       local exec = (identifyexecutor or function() return "" end)()
         if type(exec) == "string" and exec:find("Xeno") then isXeno = true end
     end)
 
