@@ -334,18 +334,18 @@ local u861 = {
         Success = "Success"
     },
     Colors = {
-        Background = u820.fromRGB(11, 11, 17),
-        Card = u820.fromRGB(17, 17, 24),
-        CardDeep = u820.fromRGB(13, 13, 20),
-        Stroke = u820.fromRGB(36, 40, 58),
-        StrokeHot = u820.fromRGB(72, 76, 130),
-        Accent = u820.fromRGB(99, 102, 241),
-        AccentDim = u820.fromRGB(55, 58, 190),
-        AccentSoft = u820.fromRGB(172, 178, 255),
-        AccentGlow = u820.fromRGB(99, 102, 241),
-        Text = u820.fromRGB(235, 235, 245),
-        SubText = u820.fromRGB(148, 152, 185),
-        NotifyBg = u820.fromRGB(16, 16, 26),
+        Background = u820.fromRGB(8, 7, 12),
+        Card = u820.fromRGB(14, 13, 18),
+        CardDeep = u820.fromRGB(21, 20, 25),
+        Stroke = u820.fromRGB(42, 42, 46),
+        StrokeHot = u820.fromRGB(98, 98, 103),
+        Accent = u820.fromRGB(235, 234, 239),
+        AccentDim = u820.fromRGB(125, 124, 130),
+        AccentSoft = u820.fromRGB(185, 184, 190),
+        AccentGlow = u820.fromRGB(235, 234, 239),
+        Text = u820.fromRGB(235, 234, 239),
+        SubText = u820.fromRGB(100, 99, 105),
+        NotifyBg = u820.fromRGB(14, 13, 18),
         Danger = u820.fromRGB(240, 70, 70),
         Success = u820.fromRGB(72, 210, 140)
     },
@@ -483,12 +483,148 @@ function u867.load(u871, u870, u872)
     return r3_2
 end
 
+ 
+function u864.normalize_parry_method(value)
+    if type(value) == "table" then value = value.Name or value[1] end
+    local name = type(value) == "string" and string.lower(value) or ""
+    return (name == "keypress" or name == "vim") and "Keypress" or "Remote"
+end
+
+ 
+function u864.normalize_curve_method(value)
+    if type(value) == "table" then value = value.Name or value[1] end
+    if type(value) == "number" then
+        return ({"camera", "random", "camera", "backwards", "slow", "camera", "dot"})[value] or "camera"
+    end
+    local name = type(value) == "string" and string.lower(value) or ""
+    if name == "back" then name = "backwards" elseif name == "down" then name = "slow" end
+    if name == "camera" or name == "dot" or name == "backwards" or name == "slow" or name == "random" then return name end
+    return "camera"
+end
+
+function u864.keybind_is_clear(input)
+    return input.UserInputType == u824.UserInputType.Keyboard and input.KeyCode == u824.KeyCode.Backspace
+end
+function u864.keybind_can_capture(input, processed, keyboardOnly)
+    if keyboardOnly ~= false and input.UserInputType ~= u824.UserInputType.Keyboard then return false end
+    return input.KeyCode ~= u824.KeyCode.Unknown and (not processed or u864.keybind_is_clear(input))
+end
+function u864.finish_keybind_capture()
+     
+    task.defer(function() u864._choosing_keybind = false end)
+end
+
 u864._config = u867:load(u796.GameId)
+do
+    local legacyPrefix = string.char(102, 108, 121, 116, 101, 95)
+    local changed = false
+    for _, name in ipairs({"_flags", "_keybinds"}) do
+        local saved = u864._config[name]
+        if type(saved) == "table" then
+            local pending = {}
+            for key, value in pairs(saved) do
+                if type(key) == "string" and string.sub(key, 1, #legacyPrefix) == legacyPrefix then
+                    pending[#pending + 1] = {Key = key, Value = value}
+                end
+            end
+            for _, entry in ipairs(pending) do
+                local key = "sapphire_" .. string.sub(entry.Key, #legacyPrefix + 1)
+                if saved[key] == nil then saved[key] = entry.Value end
+                saved[entry.Key] = nil
+                changed = true
+            end
+        end
+    end
+    if changed then u867:save(u796.GameId, u864._config) end
+end
+ 
+do
+    local saved = u864._config._flags
+    if type(saved) == "table" then
+        local changed = false
+        for _, key in ipairs({"parry_mode", "manual_spam_mode", "auto_spam_mode", "sapphire_trigger_type", "sapphire_fury_method"}) do
+            if saved[key] ~= nil then
+                local method = u864.normalize_parry_method(saved[key])
+                if saved[key] ~= method then saved[key], changed = method, true end
+            end
+        end
+        if changed then u867:save(u796.GameId, u864._config) end
+    end
+end
+
+ 
+do
+    local changed = false
+    local saved = u864._config._flags
+    if type(saved) == "table" then
+        local old = saved.curve_method
+        if old == nil then old = saved.curve_mode end
+        if old ~= nil then
+            local method = u864.normalize_curve_method(old)
+            method = method:sub(1, 1):upper() .. method:sub(2)
+            if saved.curve_method ~= method then saved.curve_method, changed = method, true end
+        end
+        if saved.curve_mode ~= nil then saved.curve_mode, changed = nil, true end
+    end
+    local bindings = u864._config._keybinds
+    if type(bindings) == "table" then
+        for _, oldName in ipairs({"Camera", "Random", "Accelerated", "Back", "Down", "Up", "Dot", "camera", "random", "dot", "backwards", "slow"}) do
+            local oldKey = "curve_mode_" .. oldName
+            local value = bindings[oldKey]
+            if value ~= nil then
+                 
+                if oldName ~= "Accelerated" and oldName ~= "Up" then
+                    local label = u864.normalize_curve_method(oldName)
+                    local newKey = "curve_method_" .. label:sub(1, 1):upper() .. label:sub(2)
+                    if bindings[newKey] == nil then bindings[newKey] = value end
+                end
+                bindings[oldKey], changed = nil, true
+            end
+        end
+    end
+     
+    if type(bindings) == "table" then
+        for _, name in ipairs({"camera", "dot", "backwards", "slow", "random"}) do
+            local oldKey = "curve_method_" .. name
+            local newKey = "curve_method_" .. name:sub(1, 1):upper() .. name:sub(2)
+            if bindings[oldKey] ~= nil then
+                if bindings[newKey] == nil then bindings[newKey] = bindings[oldKey] end
+                bindings[oldKey], changed = nil, true
+            end
+        end
+    end
+    local library = u864._config._library
+    if type(library) == "table" and library.curve_mode_dd_notify ~= nil then
+        if library.curve_method_dd_notify == nil then library.curve_method_dd_notify = library.curve_mode_dd_notify end
+        library.curve_mode_dd_notify, changed = nil, true
+    end
+    if changed then u867:save(u796.GameId, u864._config) end
+end
+
 __S[3] = u864._config._gui
 
 if not __S[3] then
     __S[3] = {}
     u864._config._gui = __S[3]
+end
+
+ 
+do
+    local changed = false
+    for key, value in pairs(u864._config._keybinds or {}) do
+        if value == "Backspace" or value == "Enum.KeyCode.Backspace" then
+            u864._config._keybinds[key], changed = nil, true
+        end
+    end
+    for _, value in pairs(u864._config._flags or {}) do
+        if type(value) == "table" and (value.BIND == "Backspace" or value.BIND == "Enum.KeyCode.Backspace") then
+            value.BIND, changed = "Unknown", true
+        end
+    end
+    if __S[3].toggle_key == "Backspace" or __S[3].toggle_key == "Enum.KeyCode.Backspace" then
+        __S[3].toggle_key, changed = false, true
+    end
+    if changed then u867:save(u796.GameId, u864._config) end
 end
 
 if __S[3].toggle_key == nil then
@@ -528,7 +664,7 @@ function u864.SendNotification(r0)
     u874.Parent = u873
     local u875 = r6.new("Frame")
     u875.Size = u821.new(1, 0, 1, 0)
-    u875.BackgroundColor3 = u820.fromRGB(16, 16, 25)
+    u875.BackgroundColor3 = u820.fromRGB(14, 13, 18)
     u875.BackgroundTransparency = 0
     u875.BorderSizePixel = 0
     u875.ClipsDescendants = true
@@ -882,9 +1018,9 @@ function u864.create_ui(u876)
     r47.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", u824.FontWeight.Bold)
     r47.TextColor3 = u877.Accent
     r47.TextTransparency = 0.05
-    r47.Text = "Allusive"
+    r47.Text = "Sapphire"
     r47.Name = "ClientName"
-    r47.Size = u821.new(0, 68, 0, 14)
+    r47.Size = u821.new(0, 140, 0, 18)
     r47.AnchorPoint = Vector2.new(0, 0.5)
     r47.Position = u821.new(0.056, 0, 0.055, 0)
     r47.BackgroundTransparency = 1
@@ -915,7 +1051,7 @@ function u864.create_ui(u876)
     local u885 = r4.new("ImageLabel")
     u885.ScaleType = u824.ScaleType.Fit
     u885.AnchorPoint = Vector2.new(0, 0.5)
-    u885.Image = "rbxassetid://99206841644167"
+    u885.Image = "rbxassetid://10723396000"
     u885.BackgroundTransparency = 1
     u885.Position = u821.new(0.025, 0, 0.055, 0)
     u885.Name = "Icon"
@@ -923,7 +1059,7 @@ function u864.create_ui(u876)
     u885.BorderSizePixel = 0
     u885.ImageColor3 = u877.AccentSoft
     u885.Parent = u880
-    u885.ImageRectSize = Vector2.new(32, 32)
+    u885.ImageRectSize = Vector2.new(0, 0)
 
     task.spawn(function()
     end)
@@ -956,6 +1092,176 @@ function u864.create_ui(u876)
     u876._theme_pin = r65
     u876._theme_logo = u885
     u876._theme_tabs_ref = u884
+
+     
+    do
+        local G = {Idle = {}, Hover = {}, Connections = {}, Active = false, Destroyed = false}
+        u876._title_gem = G
+        local badge = r4.new("Frame")
+        badge.Name = "SapphireGemBadge"
+        badge.AnchorPoint = Vector2.new(0.5, 0.5)
+        badge.Position = u821.new(0.025, 5, 0.055, 0)
+        badge.Size = u821.fromOffset(22, 22)
+        badge.BackgroundColor3 = u877.AccentDim
+        badge.BackgroundTransparency = 0.68
+        badge.BorderSizePixel = 0
+        badge.Active = false
+        badge.ZIndex = u885.ZIndex
+        badge.Parent = u880
+        local corner = r4.new("UICorner")
+        corner.CornerRadius = u822.new(0, 7)
+        corner.Parent = badge
+        local border = r4.new("UIStroke")
+        border.Name = "GemRim"
+        border.Color = u877.AccentSoft
+        border.Thickness = 0.8
+        border.Transparency = 0.62
+        border.ApplyStrokeMode = u824.ApplyStrokeMode.Border
+        border.Parent = badge
+        local rimGradient = r4.new("UIGradient")
+        rimGradient.Rotation = 35
+        rimGradient.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.05),
+            NumberSequenceKeypoint.new(0.45, 0.75),
+            NumberSequenceKeypoint.new(1, 0.1)
+        })
+        rimGradient.Parent = border
+        local hoverScale = r4.new("UIScale")
+        hoverScale.Scale = 1
+        hoverScale.Parent = badge
+        local jewel = r4.new("Frame")
+        jewel.Name = "GemMotion"
+        jewel.AnchorPoint = Vector2.new(0.5, 0.5)
+        jewel.Position = u821.new(0.5, 0, 0.5, 0)
+        jewel.Size = u821.new(1, 0, 1, 0)
+        jewel.BackgroundTransparency = 1
+        jewel.Rotation = -3
+        jewel.Active = false
+        jewel.Parent = badge
+        local breath = r4.new("UIScale")
+        breath.Scale = 1
+        breath.Parent = jewel
+        local function overlay(name, size, opacity)
+            local image = r4.new("ImageLabel")
+            image.Name = name
+            image.Image = u885.Image
+            image.ImageRectSize = Vector2.new(0, 0)
+            image.ScaleType = u824.ScaleType.Fit
+            image.AnchorPoint = Vector2.new(0.5, 0.5)
+            image.Position = u821.new(0.5, 0, 0.5, 0)
+            image.Size = u821.fromOffset(size, size)
+            image.ImageColor3 = u877.AccentSoft
+            image.ImageTransparency = opacity
+            image.BackgroundTransparency = 1
+            image.BorderSizePixel = 0
+            image.Active = false
+            image.ZIndex = u885.ZIndex
+            image.Parent = jewel
+            return image
+        end
+        local aura = overlay("GemAura", 21, 0.9)
+        u885.Parent = jewel
+        u885.AnchorPoint = Vector2.new(0.5, 0.5)
+        u885.Position = u821.new(0.5, 0, 0.5, 0)
+        u885.Size = u821.fromOffset(16, 16)
+        u885.ZIndex = badge.ZIndex + 1
+        local facet = r4.new("UIGradient")
+        facet.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, u820.fromRGB(255, 255, 255)),
+            ColorSequenceKeypoint.new(0.5, u820.fromRGB(173, 185, 255)),
+            ColorSequenceKeypoint.new(1, u820.fromRGB(242, 246, 255))
+        })
+        facet.Rotation = 35
+        facet.Parent = u885
+        local hoverLight = overlay("GemHoverLight", 18, 1)
+        hoverLight.ZIndex = badge.ZIndex + 2
+        local glint = overlay("GemGlint", 16, 0.12)
+        glint.ZIndex = badge.ZIndex + 3
+        glint.ImageColor3 = u820.fromRGB(244, 249, 255)
+        local shine = r4.new("UIGradient")
+        shine.Rotation = 25
+        shine.Offset = Vector2.new(-1.15, 0)
+        shine.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.38, 1),
+            NumberSequenceKeypoint.new(0.5, 0),
+            NumberSequenceKeypoint.new(0.62, 1),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        shine.Parent = glint
+        local function idle(object, info, goal)
+            table.insert(G.Idle, u832:Create(object, info, goal))
+        end
+        local slow = TweenInfo.new(3.4, u824.EasingStyle.Sine, u824.EasingDirection.InOut, -1, true)
+        idle(jewel, slow, {Rotation = 3})
+        idle(breath, slow, {Scale = 1.035})
+        idle(aura, slow, {ImageTransparency = 0.76})
+        idle(shine, TweenInfo.new(1.35, u824.EasingStyle.Sine, u824.EasingDirection.InOut, -1, false, 2.8),
+            {Offset = Vector2.new(1.15, 0)})
+        idle(rimGradient, TweenInfo.new(9, u824.EasingStyle.Linear, u824.EasingDirection.InOut, -1), {Rotation = 395})
+        local function listen(signal, callback)
+            table.insert(G.Connections, signal:Connect(callback))
+        end
+        local function cancelHover()
+            for _, tween in ipairs(G.Hover) do tween:Cancel() end
+            table.clear(G.Hover)
+        end
+        function G.SetHover(entered)
+            if G.Destroyed or not G.Active then return end
+            cancelHover()
+            local info = TweenInfo.new(entered and 0.22 or 0.32, u824.EasingStyle.Quint, u824.EasingDirection.Out)
+            table.insert(G.Hover, u832:Create(hoverScale, info, {Scale = entered and 1.08 or 1}))
+            table.insert(G.Hover, u832:Create(hoverLight, info, {ImageTransparency = entered and 0.5 or 1}))
+            for _, tween in ipairs(G.Hover) do tween:Play() end
+        end
+        function G.Refresh()
+            if G.Destroyed then return end
+            local visible = u878.Enabled and u878.Parent ~= nil and u879.Visible and u880.Visible
+                and u879.AbsoluteSize.X > 1 and u879.AbsoluteSize.Y > 1
+            if visible == G.Active then return end
+            G.Active = visible
+            if visible then
+                for _, tween in ipairs(G.Idle) do tween:Play() end
+            else
+                for _, tween in ipairs(G.Idle) do tween:Pause() end
+                cancelHover()
+                hoverScale.Scale, hoverLight.ImageTransparency = 1, 1
+            end
+        end
+        function G.Retint()
+            if G.Destroyed then return end
+            local colors = u861.Colors
+            badge.BackgroundColor3 = colors.AccentDim
+            border.Color = colors.AccentSoft
+            aura.ImageColor3, hoverLight.ImageColor3 = colors.AccentSoft, colors.AccentSoft
+        end
+        function G.Destroy()
+            if G.Destroyed then return end
+            G.Destroyed, G.Active = true, false
+            cancelHover()
+            for _, tween in ipairs(G.Idle) do tween:Cancel() end
+            for _, connection in ipairs(G.Connections) do connection:Disconnect() end
+            table.clear(G.Idle)
+            table.clear(G.Connections)
+            if u876._title_gem == G then u876._title_gem = nil end
+            if u876._theme_logo == u885 then u876._theme_logo = nil end
+             
+            badge:Destroy()
+        end
+        listen(r81.MouseEnter, function() G.SetHover(true) end)
+        listen(r81.MouseLeave, function() G.SetHover(false) end)
+        listen(u878:GetPropertyChangedSignal("Enabled"), G.Refresh)
+        listen(u879:GetPropertyChangedSignal("Visible"), G.Refresh)
+        listen(u880:GetPropertyChangedSignal("Visible"), G.Refresh)
+        listen(u879:GetPropertyChangedSignal("AbsoluteSize"), G.Refresh)
+        listen(u885:GetPropertyChangedSignal("ImageColor3"), G.Retint)
+        listen(u878.AncestryChanged, function(_, parent)
+            if parent == nil then G.Destroy() else G.Refresh() end
+        end)
+        listen(u878.Destroying, G.Destroy)
+        G.Refresh()
+    end
+     
 
     local function r18(u888)
         if u864._blocking_drag then
@@ -1071,7 +1377,7 @@ function u864.create_ui(u876)
         end
 
         if not r1 then
-            r1 = u821.fromOffset(104.5, 52)
+            r1 = u821.fromOffset(132, 52)
         end
 
         r15.Size = r1
@@ -1318,8 +1624,8 @@ function u864.create_ui(u876)
 
         r6_3.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, u877.Text),
-            ColorSequenceKeypoint.new(0.65, u820.fromRGB(120, 124, 185)),
-            ColorSequenceKeypoint.new(1, u820.fromRGB(58, 60, 100))
+            ColorSequenceKeypoint.new(0.65, u820.fromRGB(148, 147, 153)),
+            ColorSequenceKeypoint.new(1, u820.fromRGB(75, 74, 80))
         })
 
         r6_3.Parent = r5_4
@@ -1565,7 +1871,7 @@ function u864.create_ui(u876)
             u909.Position = u821.new(0.82, 0, 0.757, 0)
             u909.Size = u821.new(0, 26, 0, 13)
             u909.BorderSizePixel = 0
-            u909.BackgroundColor3 = u820.fromRGB(8, 8, 14)
+            u909.BackgroundColor3 = u820.fromRGB(8, 7, 12)
             u909.Parent = r16
             local r4_9 = u859.new("UICorner")
             r4_9.CornerRadius = u822.new(0, 12)
@@ -1724,7 +2030,7 @@ function u864.create_ui(u876)
                     u832:Create(u904, TweenInfo.new(0.5, u824.EasingStyle.Quint, u824.EasingDirection.Out), {Size = u821.new(1, -8, 0, 93)}):Play()
 
                     u832:Create(u909, TweenInfo.new(0.45, u824.EasingStyle.Quint, u824.EasingDirection.Out), {
-                        BackgroundColor3 = u820.fromRGB(8, 8, 14),
+                        BackgroundColor3 = u820.fromRGB(8, 7, 12),
                         BackgroundTransparency = 0.6
                     }):Play()
 
@@ -1761,7 +2067,7 @@ function u864.create_ui(u876)
                 end
 
                 u863[u903.flag .. "_keybind"] = u830.InputBegan:Connect(function(r0, r1)
-                    if r1 then
+                    if r1 or u864._choosing_keybind or u864.keybind_is_clear(r0) then
                         return
                     end
 
@@ -1823,13 +2129,7 @@ function u864.create_ui(u876)
                 u864._choosing_keybind = true
 
                 function u919(r0, r1)
-                    if r1 then
-                        return
-                    end
-
-                    if r0.KeyCode == u824.KeyCode.Unknown then
-                        return
-                    end
+                    if not u864.keybind_can_capture(r0, r1, false) then return end
 
                     if r0.KeyCode == u824.KeyCode.Backspace then
                         u901:scale_keybind(true)
@@ -1838,7 +2138,7 @@ function u864.create_ui(u876)
                         u912.Text = "None"
                         u863:disconnect(u903.flag .. "_keybind")
                         u863:disconnect("keybind_choose_start")
-                        u864._choosing_keybind = false
+                        u864.finish_keybind_capture()
                         return
                     end
 
@@ -1848,7 +2148,7 @@ function u864.create_ui(u876)
                     u863:disconnect(u903.flag .. "_keybind")
                     u901:connect_keybind()
                     u901:scale_keybind()
-                    u864._choosing_keybind = false
+                    u864.finish_keybind_capture()
                     u912.Text = u864._config._keybinds[u903.flag]:gsub("Enum.KeyCode.", "")
                 end
 
@@ -1939,7 +2239,7 @@ function u864.create_ui(u876)
                 r3.Parent = r2_5
                 local u926 = u859.new("TextLabel")
                 u926.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", u824.FontWeight.SemiBold)
-                u926.TextColor3 = u820.fromRGB(235, 235, 245)
+                u926.TextColor3 = u820.fromRGB(235, 234, 239)
                 u926.TextTransparency = 0.2
                 u926.Text = "0"
                 u926.Name = "Value"
@@ -2177,10 +2477,28 @@ function u864.create_ui(u876)
                     u940.Text = u933(r6) .. " - " .. u933(r7)
                     local r12 = u943(r6)
                     local r4_2 = u943(r7)
-                    u937.Position = u821.new(r12, 0, 0.5, 0)
-                    u937.Size = u821.new(math.max(r4_2 - r12, 0.02), 0, 1, 0)
-                    u938.Position = u821.new(r12, 0, 0.5, 0)
-                    u939.Position = u821.new(r4_2, 0, 0.5, 0)
+                    if r0._visualReady then
+                         
+                         
+                        for _, tween in ipairs(r0._visualTweens or {}) do tween:Cancel() end
+                        local info = TweenInfo.new(0.5, u824.EasingStyle.Quint, u824.EasingDirection.Out)
+                        r0._visualTweens = {
+                            u832:Create(u937, info, {
+                                Position = u821.new(r12, 0, 0.5, 0),
+                                Size = u821.new(math.max(r4_2 - r12, 0.02), 0, 1, 0)
+                            }),
+                            u832:Create(u938, info, {Position = u821.new(r12, 0, 0.5, 0)}),
+                            u832:Create(u939, info, {Position = u821.new(r4_2, 0, 0.5, 0)})
+                        }
+                        for _, tween in ipairs(r0._visualTweens) do tween:Play() end
+                    else
+                         
+                        u937.Position = u821.new(r12, 0, 0.5, 0)
+                        u937.Size = u821.new(math.max(r4_2 - r12, 0.02), 0, 1, 0)
+                        u938.Position = u821.new(r12, 0, 0.5, 0)
+                        u939.Position = u821.new(r4_2, 0, 0.5, 0)
+                    end
+                    r0._visualReady = true
                     u930.callback(r6, r7)
 
                     if not r3 and not u930.ignoresaved then
@@ -2268,6 +2586,11 @@ function u864.create_ui(u876)
                     end
 
                     u944(u942:pick_which(r0.Position.X))
+                end)
+
+                r11.Destroying:Connect(function()
+                    for _, tween in ipairs(u942._visualTweens or {}) do tween:Cancel() end
+                    u942._visualTweens = nil
                 end)
 
                 return u942
@@ -2717,7 +3040,7 @@ function u864.create_ui(u876)
 
                         if r4 then
                             u863["dd_kb_" .. u964] = u830.InputBegan:Connect(function(r0, r1)
-                                if r1 then
+                                if r1 or u864._choosing_keybind or u864.keybind_is_clear(r0) then
                                     return
                                 end
 
@@ -2744,17 +3067,7 @@ function u864.create_ui(u876)
                             local u968
 
                             function u967(r0, r1)
-                                if r1 then
-                                    return
-                                end
-
-                                if r0.UserInputType ~= u824.UserInputType.Keyboard then
-                                    return
-                                end
-
-                                if r0.KeyCode == u824.KeyCode.Unknown then
-                                    return
-                                end
+                                if not u864.keybind_can_capture(r0, r1) then return end
 
                                 u968:Disconnect()
 
@@ -2773,7 +3086,7 @@ function u864.create_ui(u876)
                                     local u969 = "dd_kb_" .. u964
 
                                     u863[u969] = u830.InputBegan:Connect(function(r0, r1)
-                                        if r1 then
+                                        if r1 or u864._choosing_keybind or u864.keybind_is_clear(r0) then
                                             return
                                         end
 
@@ -2785,7 +3098,7 @@ function u864.create_ui(u876)
                                     end)
                                 end
 
-                                u864._choosing_keybind = false
+                                u864.finish_keybind_capture()
                             end
 
                             u968 = u830.InputBegan:Connect(u967)
@@ -3132,9 +3445,7 @@ function u864.create_ui(u876)
                     local u979 = u830.InputBegan
 
                     u978 = u979:Connect(function(r0, r1)
-                        if r1 or r0.UserInputType ~= u824.UserInputType.Keyboard or r0.KeyCode == u824.KeyCode.Unknown then
-                            return
-                        end
+                        if not u864.keybind_can_capture(r0, r1) then return end
 
                         u978:Disconnect()
 
@@ -3148,30 +3459,16 @@ function u864.create_ui(u876)
                             u864._config._keybinds[u972.flag] = tostring(r0.KeyCode)
                             u867:save(u796.GameId, u864._config)
                             u863:disconnect(u972.flag .. "_keybind")
-                            local u980 = u830.InputBegan
-
-                            local function r1_2(r0, r1)
-                                if r1 then
-                                    return
-                                end
-
-                                if tostring(r0.KeyCode) == u864._config._keybinds[u972.flag] then
-                                    u970:change_state(not u970._state)
-                                end
-                            end
-
-                            u863[u972.flag .. "_keybind"] = u980:Connect(r1_2)
-                            u980 = "Enum.KeyCode."
-                            u974.Text = u864._config._keybinds[u972.flag]:gsub(u980, "")
+                            u974.Text = u864._config._keybinds[u972.flag]:gsub("Enum.KeyCode%.", "")
                             u975(u974.Text)
                         end
 
-                        u864._choosing_keybind = false
+                        u864.finish_keybind_capture()
                     end)
                 end)
 
                 u863[u972.flag .. "_keypress"] = u830.InputBegan:Connect(function(r0, r1)
-                    if r1 or r0.UserInputType ~= u824.UserInputType.Keyboard then
+                    if r1 or u864._choosing_keybind or u864.keybind_is_clear(r0) or r0.UserInputType ~= u824.UserInputType.Keyboard then
                         return
                     end
 
@@ -3204,7 +3501,7 @@ function u864.create_ui(u876)
                 if r1 and r1.showtopic then
                     local r3 = u859.new("TextLabel")
                     r3.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", u824.FontWeight.SemiBold)
-                    r3.TextColor3 = u820.fromRGB(235, 235, 245)
+                    r3.TextColor3 = u820.fromRGB(235, 234, 239)
                     r3.TextTransparency = 0.2
                     r3.Text = r1.title
                     r3.Size = u821.new(0, 153, 0, 13)
@@ -3229,7 +3526,7 @@ function u864.create_ui(u876)
                 if r1 then
                     local r3_3 = u859.new("Frame")
                     r3_3.Size = u821.new(1, 0, 0, 1)
-                    r3_3.BackgroundColor3 = u820.fromRGB(235, 235, 245)
+                    r3_3.BackgroundColor3 = u820.fromRGB(235, 234, 239)
                     r3_3.BorderSizePixel = 0
                     r3_3.ZIndex = 2
                     r3_3.BackgroundTransparency = 0.55
@@ -3282,7 +3579,7 @@ function u864.create_ui(u876)
                 u982.Size = u821.new(0, 207, 0, 20)
                 u982.BorderSizePixel = 0
                 u982.TextSize = 11
-                u982.BackgroundColor3 = u820.fromRGB(22, 22, 35)
+                u982.BackgroundColor3 = u820.fromRGB(21, 20, 25)
                 u982.BackgroundTransparency = 0
                 u982.ClearTextOnFocus = false
                 u982.Parent = u916
@@ -3396,7 +3693,7 @@ function u864.create_ui(u876)
 
                 u984.MouseEnter:Connect(function()
                     u832:Create(u984, TweenInfo.new(0.25, u824.EasingStyle.Quint, u824.EasingDirection.Out), {
-                        BackgroundColor3 = u820.fromRGB(20, 20, 32),
+                        BackgroundColor3 = u820.fromRGB(21, 20, 25),
                         BackgroundTransparency = 0.08
                     }):Play()
                 end)
@@ -3464,7 +3761,7 @@ function u864.create_ui(u876)
 
                 u985.MouseEnter:Connect(function()
                     u832:Create(u985, TweenInfo.new(0.25, u824.EasingStyle.Quint, u824.EasingDirection.Out), {
-                        BackgroundColor3 = u820.fromRGB(20, 20, 32),
+                        BackgroundColor3 = u820.fromRGB(21, 20, 25),
                         BackgroundTransparency = 0.08
                     }):Play()
                 end)
@@ -3581,6 +3878,8 @@ function u864.create_ui(u876)
                     u864._config._flags[u987.flag] = {checked = false, BIND = u987.default or "Unknown"}
                 end
 
+                 
+                if u987.momentary then u864._config._flags[u987.flag].checked = false end
                 local u989 = u864._config._flags[u987.flag].checked
                 u988.Text = u864._config._flags[u987.flag].BIND == "Unknown" and "..." or u864._config._flags[u987.flag].BIND
                 local u991
@@ -3604,6 +3903,20 @@ function u864.create_ui(u876)
                     r3_7.Parent = u990
 
                     function u991()
+                        if u987.momentary then
+                            u832:Create(u990, TweenInfo.new(0.12), {
+                                BackgroundColor3 = u877.Accent, BackgroundTransparency = 0.32
+                            }):Play()
+                            task.delay(0.15, function()
+                                if u990.Parent then
+                                    u832:Create(u990, TweenInfo.new(0.18), {
+                                        BackgroundColor3 = u877.CardDeep, BackgroundTransparency = 0.5
+                                    }):Play()
+                                end
+                            end)
+                            if u987.button_callback then u987.button_callback() end
+                            return
+                        end
                         u989 = not u989
 
                         u832:Create(u990, TweenInfo.new(0.3), {
@@ -3629,39 +3942,30 @@ function u864.create_ui(u876)
                 end
 
                 r13.MouseButton1Click:Connect(function()
+                    if u864._choosing_keybind then return end
+                    u864._choosing_keybind = true
                     u988.Text = "..."
+                    u863:disconnect("feat_keybind_input_" .. u987.flag)
                     local u992
-
-                    u992 = u830.InputBegan:Connect(function(r0, r1)
-                        if r1 then
-                            return
-                        end
-
-                        if r0.UserInputType == u824.UserInputType.Keyboard then
-                            local r3 = r0.KeyCode.Name
-                            u864._config._flags[u987.flag].BIND = r3
-                            u988.Text = r3 ~= "Unknown" and r3 or "..."
-                            u867:save(u796.GameId, u864._config)
-                            u992:Disconnect()
-                        elseif r0.UserInputType == u824.UserInputType.MouseButton3 then
-                            u864._config._flags[u987.flag].BIND = "Unknown"
-                            u988.Text = "..."
-                            u867:save(u796.GameId, u864._config)
-                            u992:Disconnect()
-                        end
+                    u992 = u830.InputBegan:Connect(function(input, processed)
+                        local clear = u864.keybind_is_clear(input)
+                        local middle = input.UserInputType == u824.UserInputType.MouseButton3 and not processed
+                        if not clear and not middle and not u864.keybind_can_capture(input, processed) then return end
+                        local name = (clear or middle) and "Unknown" or input.KeyCode.Name
+                        u864._config._flags[u987.flag].BIND = name
+                        u988.Text = name == "Unknown" and "..." or name
+                        u867:save(u796.GameId, u864._config)
+                        u992:Disconnect()
+                        u863["feat_keybind_input_" .. u987.flag] = nil
+                        u864.finish_keybind_capture()
                     end)
-
                     u863["feat_keybind_input_" .. u987.flag] = u992
                 end)
 
-                u863["feat_keybind_press_" .. u987.flag] = u830.InputBegan:Connect(function(r0, r1)
-                    if r1 or r0.UserInputType ~= u824.UserInputType.Keyboard then
-                        return
-                    end
-
-                    if r0.KeyCode.Name == u864._config._flags[u987.flag].BIND then
-                        u991()
-                    end
+                u863["feat_keybind_press_" .. u987.flag] = u830.InputBegan:Connect(function(input, processed)
+                    if processed or u864._choosing_keybind or u864.keybind_is_clear(input)
+                        or input.UserInputType ~= u824.UserInputType.Keyboard then return end
+                    if input.KeyCode.Name == u864._config._flags[u987.flag].BIND then u991() end
                 end)
 
                 r10.MouseButton1Click:Connect(function()
@@ -3670,7 +3974,7 @@ function u864.create_ui(u876)
                     end
                 end)
 
-                if not u987.disablecheck and u987.callback then
+                if not u987.disablecheck and not u987.momentary and u987.callback then
                     u987.callback(u989)
                 end
 
@@ -4685,8 +4989,11 @@ function u864.create_ui(u876)
 
     function u876.bind_gui_toggle_key(u1015)
         u863:disconnect("library_visibility")
-        local r4 = (u864._config._gui and u864._config._gui.toggle_key or "Enum.KeyCode.RightControl"):gsub("Enum.KeyCode%.", "")
-        local u1014 = u824.KeyCode.RightControl
+        local saved = u864._config._gui and u864._config._gui.toggle_key
+        if saved == false then return end
+        local r4 = (saved or "Enum.KeyCode.RightControl"):gsub("Enum.KeyCode%.", "")
+        if r4 == "Backspace" or r4 == "Unknown" or r4 == "None" then return end
+        local u1014
 
         for r2, r3 in u824.KeyCode:GetEnumItems() do
             if r3.Name == r4 then
@@ -4695,8 +5002,9 @@ function u864.create_ui(u876)
             end
         end
 
+        if not u1014 then return end
         u863["library_visibility"] = u830.InputBegan:Connect(function(r0, r1)
-            if r1 then
+            if r1 or u864._choosing_keybind or u864.keybind_is_clear(r0) then
                 return
             end
 
@@ -4826,32 +5134,29 @@ function u864.create_ui(u876)
         u1022.Parent = r3_2
 
         local function u1023()
-            u1022.Text = (u864._config._gui.toggle_key or "Enum.KeyCode.RightControl"):gsub("Enum.KeyCode.", "")
+            local saved = u864._config._gui.toggle_key
+            u1022.Text = saved == false and "None" or (saved or "Enum.KeyCode.RightControl"):gsub("Enum.KeyCode%.", "")
         end
 
         u1023()
         u876._gui_kb = {btn = r3_2, stroke = r3_2:FindFirstChildOfClass("UIStroke"), lbl = u1022}
 
         r3_2.MouseButton1Click:Connect(function()
+            if u864._choosing_keybind then return end
+            u864._choosing_keybind = true
             local u1025
             local r1 = u830.InputBegan
             local u1026 = r1.Connect
 
             u1026 = u1026(r1, function(r0, r1)
-                if r1 then
-                    return
-                end
-
-                if r0.KeyCode == u824.KeyCode.Unknown then
-                    return
-                end
+                if not u864.keybind_can_capture(r0, r1, false) then return end
 
                 if r0.KeyCode == u824.KeyCode.Backspace then
-                    u864._config._gui.toggle_key = "Enum.KeyCode.RightControl"
+                    u864._config._gui.toggle_key = false
                     u867:save(u796.GameId, u864._config)
                     u1023()
                     u876:bind_gui_toggle_key()
-                    u1025:Disconnect()
+                    u1025:Disconnect(); u864.finish_keybind_capture()
                     return
                 end
 
@@ -4859,10 +5164,11 @@ function u864.create_ui(u876)
                 u867:save(u796.GameId, u864._config)
                 u1023()
                 u876:bind_gui_toggle_key()
-                u1025:Disconnect()
+                u1025:Disconnect(); u864.finish_keybind_capture()
             end)
 
             u1025 = u1026
+            u863.gui_keybind_choose = u1025
         end)
 
         local r2_5 = u859.new("Frame")
@@ -4884,7 +5190,7 @@ function u864.create_ui(u876)
         u1027.Size = u821.new(0, 36, 0, 18)
         u1027.AnchorPoint = Vector2.new(1, 0.5)
         u1027.Position = u821.new(1, 0, 0.5, 0)
-        u1027.BackgroundColor3 = u820.fromRGB(8, 8, 14)
+        u1027.BackgroundColor3 = u820.fromRGB(8, 7, 12)
         u1027.BackgroundTransparency = 0.6
         u1027.Text = ""
         u1027.AutoButtonColor = false
@@ -5069,7 +5375,6 @@ function u864.create_ui(u876)
         local u1036 = {}
 
         local u1037 = {
-            {title = "Main Color", key = "Background", flag = "_gui_col_bg"},
             {title = "Secondary", key = "Card", flag = "_gui_col_card"},
             {title = "Accent", key = "Accent", flag = "_gui_col_accent"},
             {title = "Stroke", key = "Stroke", flag = "_gui_col_stroke"},
@@ -5516,24 +5821,22 @@ local u1070 = {
     config = {
         auto_parry = false,
         accuracy = 75,
+        parry_range = 0,
+        parry_loop = "PreSimulation",
         randomize_accuracy = false,
         random_accuracy_min = 1,
         random_accuracy_max = 100,
-        curve_mode = 2,
+        curve_method = "camera",
         parry_mode = "Remote",
         is_mobile = u1056.TouchEnabled and not u1056.MouseEnabled,
+        auto_parry_animation_fix = false,
+        predictive_timing = false,
         target_player_enabled = false,
         target_player_name = nil,
         kill_pre_click = false,
+        preclick_for_all = false,
         kill_pre_click_range = 30,
         kill_pre_click_speed = 1
-    },
-    detections = {
-        infinity = false,
-        deathslash = false,
-        tornado_time = 0,
-        slashesoffury = false,
-        timehole = false
     },
     state = {
         grab_track = nil,
@@ -5544,15 +5847,8 @@ local u1070 = {
         slashesoffury_active = false,
         timehole_active = false
     },
-    curve_detection = {
-        per_ball = {},
-        curve_time = 0,
-        velocity_history = {},
-        dot_histories = {}
-    },
     cache = {
         ping = 50,
-        ping_t = 0,
         emotes_shared = nil,
         trove_module = nil
     },
@@ -5564,12 +5860,17 @@ local u1070 = {
         pending_id = 0,
         success_window = 0.75
     },
-    triggerbot = {enabled = false, is_parrying = false, connection = nil},
+    triggerbot = {
+        enabled = false, is_parrying = false, connection = nil,
+        mode = "Remote", delay = 0, randomize = false,
+        delay_min = 0, delay_max = 200, ignore_spawn = false
+    },
     spam = {
         manual_enabled = false,
         auto_enabled = false,
         parries = 0,
         threshold = 1.5,
+        distance_multiplier = 0.3,
         sensitivity_multiplier = 1,
         connection_manual = nil,
         connection_auto = nil,
@@ -5790,7 +6091,6 @@ local u1070 = {
         constants = {empty_cframe = u819.new(), velocity = u818.new(1, 1, 1)}
     },
     staff_detection = {mode = "Notify"},
-    slashesoffury_detection = {max_parries = 36, parry_delay = 0.05},
     phantom = {
         enabled = false,
         mode = "Ability",
@@ -5916,7 +6216,7 @@ __S[6] = function()
     u1064:Wait()
     v1.CFrame = u1070.immortal.state.cache.original_cframe
     v1.AssemblyLinearVelocity = u1070.immortal.state.cache.original_velocity
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.immortal.perform_desync = __S[6]
 
@@ -6002,7 +6302,7 @@ __S[3] = function(v1, v2)
     end
 
     return u1071(v1, v2)
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1071 = __S[10](u796, "__index", __S[11](__S[3]))
 
@@ -6071,7 +6371,7 @@ __S[6] = function()
     end
 
     return u1070.cache.emotes_shared or nil
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.emotes.get_shared = __S[6]
 
@@ -6099,7 +6399,7 @@ __S[6] = function()
     end
 
     return u1070.cache.trove_module or nil
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.emotes.get_trove_module = __S[6]
 
@@ -6158,7 +6458,7 @@ __S[6] = function(v1)
     end
 
     return true
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.emotes.play = __S[6]
 
@@ -6196,7 +6496,7 @@ __S[6] = function(v1)
     end
 
     return true
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.emotes.play_internal = __S[6]
 
@@ -6254,7 +6554,7 @@ __S[6] = function()
             v1.play(v1.current)
         end
     end
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.emotes.update_loop = __S[6]
 
@@ -6266,7 +6566,7 @@ __S[3] = function()
             if u1070.emotes.enabled then
                 u1070.emotes.update_loop()
             end
-        end --[[ LPH_NO_VIRTUALIZE ]]
+        end  
 
         u1070.emotes.connection = u1055.Heartbeat:Connect(r2)
     end
@@ -6292,30 +6592,396 @@ end
 
 u1070.emotes.cleanup = __S[3]
 u1070.emotes.load_animations()
-local u1073 = {"Camera", "Random", "Accelerated", "Back", "Down", "Up", "Dot"}
+local u1073 = {"Camera", "Dot", "Backwards", "Slow", "Random"}
 
-local function u1074()
-    local function r1()
-        return u1059.Network.ServerStatsItem["Data Ping"]:GetValue()
+ 
+ 
+do
+    local R = {Entries = {}, Destroyed = false}
+    u1070.runtime_cache = R
+    function R.Forget(folder)
+        local entry = R.Entries[folder]
+        if not entry then return end
+        R.Entries[folder] = nil
+        for _, connection in ipairs(entry.Connections) do connection:Disconnect() end
+        table.clear(entry.Connections)
+        entry.List = nil
     end
-
-    local r0, r1_2 = pcall(r1)
-    return r0 and r1_2 or 50
+    function R.Children(folder)
+        if R.Destroyed or folder.Parent ~= u797 then return folder:GetChildren() end
+        local entry = R.Entries[folder]
+        if not entry then
+            entry = {Connections = {}}
+            R.Entries[folder] = entry
+            local function invalidate() entry.List = nil end
+            entry.Connections[1] = folder.ChildAdded:Connect(invalidate)
+            entry.Connections[2] = folder.ChildRemoved:Connect(invalidate)
+            entry.Connections[3] = folder.Destroying:Connect(function() R.Forget(folder) end)
+        end
+        if not entry.List then entry.List = folder:GetChildren() end
+        return entry.List
+    end
+    function R.Destroy()
+        if R.Destroyed then return end
+        R.Destroyed = true
+        local folders = {}
+        for folder in pairs(R.Entries) do folders[#folders + 1] = folder end
+        for _, folder in ipairs(folders) do R.Forget(folder) end
+        if R.Removed then R.Removed:Disconnect(); R.Removed = nil end
+        if R.Cleanup then R.Cleanup:Disconnect(); R.Cleanup = nil end
+    end
+    R.Removed = u797.ChildRemoved:Connect(R.Forget)
+    if u839 then R.Cleanup = u839.Destroying:Connect(R.Destroy) end
 end
 
-__S[6] = function()
-    local v1 = u1070.cache
-    local v2 = u1066()
-
-    if v2 - v1.ping_t >= 0.12 then
-        v1.ping = u1074()
-        v1.ping_t = v2
+do
+    local function initializeAdaptivePing()
+        local function filter()
+            return {Window = {}, RawWindow = {}, Noise = 0, Trend = 0, Slope = 0, Rejected = 0, Changes = 0, Run = 0}
+        end
+        local P, N = filter(), filter()
+        P.Frames, P.Ratios, P.FrameMargin, P.StatsFailures, P.StatsRecovery = {}, {}, 0, 0, 0
+        u1070.cache.adaptive_ping, u1070.cache.floxy_ping = P, P
+        local statsItem
+        local function valid(value, zero)
+            return type(value) == "number" and value == value and value < math.huge
+                and value >= (zero and 0 or 0.001) and value <= 10000
+        end
+        local function append(list, value, size)
+            if #list >= size then table.remove(list, 1) end
+            table.insert(list, value)
+        end
+        local sortedScratch, deviationScratch = {}, {}
+        P.WorkSorted, P.WorkDeviations = sortedScratch, deviationScratch
+        local function ordered(list)
+            table.clear(sortedScratch)
+            for i = 1, #list do sortedScratch[i] = list[i] end
+            table.sort(sortedScratch)
+            return sortedScratch
+        end
+        local function percentile(sorted, fraction)
+            if #sorted == 0 then return 0 end
+            local index = 1 + (#sorted - 1) * fraction
+            local low, high = math.floor(index), math.ceil(index)
+            return sorted[low] + (sorted[high] - sorted[low]) * (index - low)
+        end
+        local function quantile(list, fraction)
+            return percentile(ordered(list), fraction)
+        end
+        local function spread(list)
+            local sorted = ordered(list)
+            local center = percentile(sorted, 0.5)
+            local lower, upper, tail = percentile(sorted, 0.25), percentile(sorted, 0.75), percentile(sorted, 0.85)
+            table.clear(deviationScratch)
+            for i = 1, #sorted do deviationScratch[i] = math.abs(sorted[i] - center) end
+            table.sort(deviationScratch)
+            local noise = math.max(percentile(deviationScratch, 0.5) * 1.4826, (upper - lower) / 1.349)
+            return center, noise, lower, upper, tail
+        end
+        local function ingest(F, value, now, native, corroborated)
+            if value ~= F.Raw then F.RawChangedAt = now end
+            F.Raw = value
+            append(F.RawWindow, value, 9)
+            if not F.Estimate then
+                F.Estimate, F.Window, F.Slope, F.UpperQuantile, F.RawNoise = value, {value}, 0, value, 0
+            else
+                local center, noise = spread(F.Window)
+                local _, rawNoise, lower, upper = spread(F.RawWindow)
+                F.RawNoise = rawNoise
+                local bothSides = #F.RawWindow >= 7 and lower < center - (native and 4 or 8)
+                    and upper > center + (native and 4 or 8)
+                local limit = math.max(native and 10 or 20, center * 0.2,
+                    math.min(native and 40 or 80, noise * 3))
+                 
+                 
+                local turns, lastDirection = 0, 0
+                for i = 2, #F.RawWindow do
+                    local change = F.RawWindow[i] - F.RawWindow[i - 1]
+                    if math.abs(change) > (native and 3 or 6) then
+                        local direction = change > 0 and 1 or -1
+                        if lastDirection ~= 0 and direction ~= lastDirection then turns += 1 end
+                        lastDirection = direction
+                    end
+                end
+                local oscillating = turns >= 3 and upper - lower > (native and 8 or 16)
+                local jitterEvidence = (bothSides or oscillating)
+                    and (corroborated or rawNoise <= math.max(native and 80 or 160, center))
+                if jitterEvidence then limit = math.max(limit, rawNoise * 3) end
+                local stale = now - F.AcceptedAt > 3
+                if math.abs(value - center) > limit or stale then
+                    local pending = F.Pending
+                    local sameSide = pending and ((value - center) * (pending.Value - center) > 0 or stale)
+                    local close = pending and math.abs(value - pending.Value) <= math.max(corroborated and limit * 2 or limit, math.abs(pending.Value - center) * 0.25)
+                    if pending and sameSide and close and now - pending.At <= 0.6 then
+                         
+                        pending.Dwell = corroborated and 0.065 or 0.085
+                        if now - pending.At < pending.Dwell then return false end
+                        F.Estimate, F.Window, F.RawWindow = (pending.Value + value) * 0.5, {pending.Value, value}, {pending.Value, value}
+                        F.UpperQuantile = math.min(pending.Value, value) + math.abs(value - pending.Value) * 0.85
+                        F.RawNoise = math.abs(value - pending.Value) * 0.5 * 1.4826
+                        F.Noise = math.min(F.Noise, math.abs(value - pending.Value) * 0.5)
+                        F.Pending, F.Slope, F.Trend, F.Run = nil, 0, 0, 0
+                        F.Changes += 1
+                    else
+                        F.Pending = {Value = value, At = now, Dwell = corroborated and 0.065 or 0.085}; F.Rejected += 1
+                        return false
+                    end
+                else
+                    F.Pending = nil
+                    local previous = F.Estimate
+                    local difference = value - previous
+                    local direction = difference > 0 and 1 or difference < 0 and -1 or 0
+                    F.Run = direction ~= 0 and direction == F.Direction and F.Run + 1 or 1
+                    F.Direction = direction
+                    local coherent = F.Run >= 2 and math.abs(difference) > math.max(3, F.Noise * 0.75)
+                    local alpha = coherent and (direction > 0 and 0.65 or 0.55)
+                        or (F.Noise > 2 and 0.25 or (direction > 0 and 0.4 or 0.35))
+                    local dt = math.clamp(now - F.AcceptedAt, 0.001, 0.3)
+                    alpha = 1 - (1 - alpha) ^ (dt / 0.1)
+                    F.Estimate = previous + difference * alpha
+                    local slopeAlpha = 1 - 0.6 ^ (dt / 0.1)
+                    F.Slope += ((F.Estimate - previous) / dt - F.Slope) * slopeAlpha
+                    F.Trend = coherent and math.max(0, F.Slope) * 0.1 or 0
+                    append(F.Window, value, 16)
+                    local _, acceptedNoise, _, _, upperQuantile = spread(F.Window)
+                    F.UpperQuantile = upperQuantile
+                    if jitterEvidence then acceptedNoise = math.max(acceptedNoise, rawNoise) end
+                    acceptedNoise = math.min(acceptedNoise, native and 30 or 60)
+                    local noiseAlpha = 1 - (acceptedNoise > F.Noise and 0.65 or 0.8) ^ (dt / 0.1)
+                    F.Noise += (acceptedNoise - F.Noise) * noiseAlpha
+                end
+            end
+            F.AcceptedAt, F.AcceptedRaw = now, value
+            F.Tail = math.max(0, (F.UpperQuantile or F.Estimate) - F.Estimate)
+            return true
+        end
+        local function calibrate(value, now)
+            if not N.AcceptedAt or now - N.AcceptedAt > 0.15 or not N.AcceptedRaw or N.AcceptedRaw <= 0 then return end
+            if math.abs(now - N.AcceptedAt) > 1e-6 then return end
+            if P.Ratio and #P.Ratios >= 4 then
+                local statsNoise, nativeNoise = P.RawNoise or 0, N.RawNoise or 0
+                if statsNoise > math.max(3, P.Estimate * 0.04) or nativeNoise > math.max(1, N.Estimate * 0.04) then return end
+            end
+            local candidate = value / N.AcceptedRaw
+            if candidate < 0.5 or candidate > 4 then P.RatioCandidates = nil; return end
+            if P.Ratio and math.abs(candidate / P.Ratio - 1) > 0.2 then
+                 
+                if #P.Ratios >= 4 then return end
+                P.RatioCandidates = P.RatioCandidates or {}
+                append(P.RatioCandidates, candidate, 3)
+                if #P.RatioCandidates < 3 then return end
+                local center, noise = spread(P.RatioCandidates)
+                if noise > center * 0.1 then return end
+                P.Ratio, P.Ratios, P.RatioCandidates = center, table.clone(P.RatioCandidates), nil
+                return
+            end
+            P.RatioCandidates = nil
+            append(P.Ratios, candidate, 9)
+            local target = quantile(P.Ratios, 0.5)
+            P.Ratio = P.Ratio and P.Ratio + (target - P.Ratio) * 0.1 or target
+        end
+        local function agreement(stats, native)
+            return P.Ratio and valid(stats, false) and valid(native, false)
+                and math.abs(stats - native * P.Ratio) <= math.max(12, math.min(stats * 0.15, 50))
+        end
+        local function ingestStats(value, now, synchronized, observedAt, nativeAccepted)
+            if P.Destroyed or not valid(value, false) then return false end
+            if value ~= P.Raw then P.FrozenCount = 0 end
+            local corroborated = synchronized ~= false and N.ObservedAt and now >= N.ObservedAt
+                and now - N.ObservedAt <= 0.15 and agreement(value, N.Raw)
+            local accepted = ingest(P, value, now, false, corroborated)
+            if accepted then
+                P.AcceptedObservedAt = observedAt or now
+                u1070.cache.ping = P.Estimate
+                if synchronized ~= false and nativeAccepted ~= false then calibrate(value, now) end
+            end
+            return accepted
+        end
+        function P.Ingest(value)
+            return ingestStats(value, u1066())
+        end
+        function P.RecordFrame(delta)
+            if P.Destroyed or not valid(delta, false) or delta < 0.001 or delta > 0.5 then return end
+            local now = u1066()
+            if P.FrameAt and (now < P.FrameAt or now - P.FrameAt > 0.5) then
+                table.clear(P.Frames)
+                P.FrameElapsed, P.FrameMargin, P.FrameSeconds = 0, 0, nil
+            end
+            P.FrameAt = now
+            append(P.Frames, delta * 1000, 32)
+            P.FrameElapsed = (P.FrameElapsed or 0) + delta
+            if #P.Frames < 12 or P.FrameElapsed < 0.1 then return end
+            P.FrameElapsed = 0
+            local frames = ordered(P.Frames)
+            P.FrameSeconds = math.clamp(percentile(frames, 0.75) / 1000, 0.004, 0.05)
+            local target = math.clamp(percentile(frames, 0.9) - 20, 0, 12)
+            P.FrameMargin += (target - P.FrameMargin) * (target > P.FrameMargin and 0.55 or 0.65)
+            if P.FrameMargin < 0.01 then P.FrameMargin = 0 end
+        end
+        local function base()
+            local now = u1066()
+            local statsAt = P.AcceptedObservedAt or P.AcceptedAt
+            local networkAt = N.AcceptedObservedAt or N.AcceptedAt
+            local statsFresh = statsAt and now >= statsAt and now - statsAt <= 0.75
+            local networkFresh = networkAt and now >= networkAt and now - networkAt <= 0.5 and (N.Estimate > 0 or not P.Estimate)
+            local recovering = P.StatsFailures >= 2 or P.Recovering and P.StatsRecovery < 2
+            if P.Estimate and statsFresh and (P.FrozenCount or 0) < 3 and not P.Pending and not recovering then
+                return P.Estimate, "stats", P.Noise, P.Trend, statsAt
+            end
+            if networkFresh then return math.clamp(N.Estimate * (P.Ratio or 1), 0, 10000), "network",
+                math.min(N.Noise * (P.Ratio or 1), 60), N.Trend * (P.Ratio or 1), networkAt end
+            if P.Estimate and (P.FrozenCount or 0) < 3 and P.StatsFailures < 2
+                and P.AcceptedAt >= (P.LastEffectiveAt or -math.huge) then
+                return P.Estimate, "last valid", 0, 0, statsAt
+            end
+            if P.LastEffective or P.Estimate then return P.LastEffective or P.Estimate, "last valid", 0, 0, P.LastEffectiveAt or P.AcceptedAt end
+            return 50, "default", 0, 0, nil
+        end
+        function P.Get() return (base()) end
+        function P.Jitter() local _, _, noise = base(); return noise end
+        local function compensation()
+            local value, source, noise, trend, at = base()
+            local now = u1066()
+            local live = source == "stats" or source == "network"
+            local tail = source == "stats" and (P.Tail or 0)
+                or source == "network" and (N.Tail or 0) * (P.Ratio or 1) or 0
+            local margin = live and math.min(8, math.max(noise * 0.25, tail * 0.35) + trend * 0.35) or 0
+            local framesFresh = P.FrameAt and now >= P.FrameAt and now - P.FrameAt <= 0.5
+            local frameMargin = framesFresh and P.FrameMargin or 0
+            local total = math.clamp(margin + frameMargin, 0, 20)
+            return value + total, value, noise, total, frameMargin, framesFresh, source, at, now, live, tail
+        end
+        function P.Snapshot()
+            local compensated, value, noise, total, frameMargin, framesFresh, source, at, now, live, tail = compensation()
+            return {NetworkPing = value, CompensationPing = compensated, Jitter = noise,
+                Margin = total, FrameMargin = frameMargin, FrameSeconds = framesFresh and P.FrameSeconds or 1 / 60,
+                Source = source, Age = at and math.max(0, now - at) or math.huge, At = now,
+                Live = live, Tail = tail, Calibrated = P.Ratio ~= nil and #P.Ratios >= 4}
+        end
+        function P.Parry() return (compensation()) end
+        local function pollInterval(now)
+            local nativeAlive = N.AcceptedAt and now - N.AcceptedAt <= 0.5 and N.Estimate > 0
+            if P.StatsFailures >= 8 and not nativeAlive then return 0.25 end
+            return P.FastUntil and now < P.FastUntil and 0.05 or 0.1
+        end
+        function P.Diagnostics()
+            local snapshot = P.Snapshot()
+            return {NetworkPing = snapshot.NetworkPing, CompensationPing = snapshot.CompensationPing, Jitter = snapshot.Jitter,
+                Margin = snapshot.Margin, FrameMargin = snapshot.FrameMargin, Source = snapshot.Source,
+                Tail = snapshot.Tail, Live = snapshot.Live, Calibrated = snapshot.Calibrated, FrameSeconds = snapshot.FrameSeconds,
+                RejectedSpikes = P.Rejected, ConfirmedChanges = P.Changes, Samples = #P.Window,
+                NativeRejectedSpikes = N.Rejected, CalibrationSamples = #P.Ratios, Scale = P.Ratio,
+                Age = snapshot.Age, SensorSkew = P.SensorSkew, Synchronized = P.Synchronized,
+                ConfirmationAt = P.ConfirmationAt, ExpiredReads = P.ExpiredReads or 0,
+                PollInterval = pollInterval(u1066())}
+        end
+        local function refreshSamples()
+            local started = u1066()
+            P.LastPollAt = started
+            if not statsItem or not statsItem.Parent or not statsItem:IsDescendantOf(u1059) then
+                local folder = u1059:FindFirstChild("Network")
+                local items = folder and folder:FindFirstChild("ServerStatsItem")
+                statsItem = items and items:FindFirstChild("Data Ping")
+            end
+            local statsOK, raw = false, nil
+            local readItem = statsItem
+            if readItem then statsOK, raw = pcall(readItem.GetValue, readItem) end
+            local statsCompleted = u1066()
+            if P.Destroyed then return false end
+            local nativeStarted = u1066()
+            local ok, network = pcall(function() return u1061:GetNetworkPing() * 1000 end)
+            if P.Destroyed then return false end
+             
+             
+            local now = u1066()
+            local statsTimely = now >= started and now - started <= 0.15
+            local nativeTimely = now >= nativeStarted and now - nativeStarted <= 0.15
+            statsOK = statsOK and statsTimely and valid(raw, false) and readItem == statsItem
+                and readItem.Parent ~= nil and readItem:IsDescendantOf(u1059)
+            if not statsTimely or not nativeTimely then P.ExpiredReads = (P.ExpiredReads or 0) + 1 end
+            local nativeOK = ok and nativeTimely and valid(network, true) and (network > 0 or not P.Estimate)
+            P.SensorSkew = math.max(0, now - statsCompleted)
+            P.Synchronized = statsOK and nativeOK and P.SensorSkew <= 0.05
+                and statsCompleted >= started and statsCompleted - started <= 0.05
+            local nativeAccepted = false
+            if nativeOK then
+                N.ObservedAt = nativeStarted
+                nativeAccepted = ingest(N, network, now, true, P.Synchronized and agreement(raw, network))
+                if nativeAccepted then
+                    N.AcceptedObservedAt = nativeStarted
+                end
+            end
+            P.Network, P.NetworkAt, P.NetworkRaw = N.Estimate, N.AcceptedAt, N.AcceptedRaw
+            if statsOK then
+                P.StatsRecovery += 1
+                local accepted = ingestStats(raw, now, P.Synchronized, started, nativeAccepted)
+                if P.StatsRecovery >= 2 and accepted then P.Recovering = false end
+                P.StatsFailures = 0
+            else
+                P.StatsFailures += 1; P.StatsRecovery = 0
+                if P.StatsFailures >= 2 then P.Recovering = true end
+            end
+            local nativeFresh = N.AcceptedAt and now - N.AcceptedAt <= 0.5 and N.Estimate > 0
+            if P.Estimate and P.Ratio and #P.Ratios >= 4 and nativeFresh then
+                local disagreement = math.abs(N.Estimate * P.Ratio - P.Estimate)
+                local threshold = math.max(18, P.Estimate * 0.15, math.min(40, (P.Noise + N.Noise * P.Ratio) * 0.75))
+                local frozen = P.RawChangedAt and now - P.RawChangedAt >= 0.25 and disagreement > threshold
+                    and ((P.FrozenCount or 0) >= 3 or N.RawChangedAt and now - N.RawChangedAt <= 0.75)
+                P.FrozenCount = frozen and (P.FrozenCount or 0) + 1 or 0
+            end
+            if P.Pending or N.Pending or P.StatsFailures > 0 or (P.FrozenCount or 0) > 0
+                or P.Noise > 12 or N.Noise * (P.Ratio or 1) > 12 or P.Trend > 2 then P.FastUntil = now + 0.75 end
+            P.ConfirmationAt = nil
+            for _, filterState in ipairs({P, N}) do
+                local pending = filterState.Pending
+                local available = filterState == P and statsOK or filterState == N and nativeOK
+                if pending and available and now >= pending.At and now - pending.At <= 0.6 then
+                    local deadline = math.max(now + 0.01, pending.At + (pending.Dwell or 0.085))
+                    P.ConfirmationAt = math.min(P.ConfirmationAt or math.huge, deadline)
+                end
+            end
+            local value, source, _, _, at = base()
+            if (source == "stats" or source == "network") and value > 0 then P.LastEffective, P.LastEffectiveAt = value, at end
+            u1070.cache.ping = value
+            return true
+        end
+        function P.Refresh()
+            if P.Destroyed or P.Refreshing then return false end
+            local token = {}
+            P.Refreshing = token
+            local ok, result = pcall(refreshSamples)
+            if P.Refreshing == token then P.Refreshing = nil end
+            if not ok then P.RefreshError = tostring(result); P.ConfirmationAt = nil; return false end
+            P.RefreshError = nil
+            return result
+        end
+        function P.Destroy()
+            P.Destroyed, P.Refreshing = true, nil
+            if P.Connection then P.Connection:Disconnect(); P.Connection = nil end
+            statsItem = nil
+            for _, list in ipairs({P.Window, P.RawWindow, P.Frames, P.Ratios, N.Window, N.RawWindow, sortedScratch, deviationScratch}) do table.clear(list) end
+            P.Pending, N.Pending, P.RatioCandidates, P.ConfirmationAt = nil, nil, nil, nil
+        end
+        u1070.cache.get_ping, u1070.cache.get_ping_jitter, u1070.cache.get_parry_ping = P.Get, P.Jitter, P.Parry
+        P.Refresh()
+        local elapsed = 0
+        P.Connection = u1063:Connect(function(delta)
+            if not valid(delta, true) then return end
+            elapsed += delta
+            if P.Refreshing then return end
+            local now = u1066()
+            local interval = pollInterval(now)
+            local scheduled = elapsed + 1e-9 >= interval
+            local confirmation = P.ConfirmationAt and now + 1e-9 >= P.ConfirmationAt
+                and (not P.LastPollAt or now - P.LastPollAt >= 0.01 - 1e-9)
+            if scheduled or confirmation then
+                elapsed = scheduled and math.max(0, elapsed - math.floor((elapsed + 1e-9) / interval) * interval) or 0
+                P.Refresh()
+            end
+        end)
     end
-
-    return v1.ping
-end --[[ LPH_NO_VIRTUALIZE ]]
-
-u1070.cache.get_ping = __S[6]
+    initializeAdaptivePing()
+end
 
 local function u1075()
     if u1070.config.is_mobile then
@@ -6328,7 +6994,7 @@ local function u1075()
 end
 
 local function u1076()
-    if u1070.config.curve_mode == 1 and u1070.config.parry_mode == "Keypress" then
+    if u1070.config.curve_method == "camera" and u1070.config.parry_mode == "Keypress" then
         u1075()
         return
     end
@@ -6394,7 +7060,7 @@ local function u1079(r0, r1, r2)
     r10_2.Text = r0
     r10_2.Font = u824.Font.GothamBold
     r10_2.TextSize = 14
-    r10_2.TextColor3 = u820.fromRGB(235, 235, 245)
+    r10_2.TextColor3 = u820.fromRGB(235, 234, 239)
     r10_2.ZIndex = 3
     r10_2.Parent = u1080
     local u1081 = false
@@ -6433,198 +7099,6 @@ local function u1079(r0, r1, r2)
 end
 
 local u1084 = u1057
-
-u808(function()
-    u1084.Remotes.DeathBall.OnClientEvent:Connect(function(r0, r1)
-        u1070.state.deathslash_active = r1 or false
-    end)
-end)
-
-u808(function()
-    u1084.Remotes.InfinityBall.OnClientEvent:Connect(function(r0, r1)
-        u1070.state.infinity_active = r1 or false
-    end)
-end)
-
-u808(function()
-    local r1 = u1084.Remotes.ParrySuccessAll.OnClientEvent
-    local u1085 = r1.Connect
-
-    u1085(r1, function(r0, r1)
-        local r2 = u1061.Character
-
-        if not r2 or not r2.PrimaryPart then
-            return
-        end
-
-        local r10 = r2.PrimaryPart
-        local r5 = u797:FindFirstChild("Balls")
-
-        if not r5 then
-            return
-        end
-
-        local r296 = r5:GetChildren()
-
-        for r3, r0_2 in ipairs(r296) do
-            if r0_2:IsA("BasePart") then
-                local r4 = r0_2:FindFirstChild("zoomies")
-
-                if r4 then
-                    local r5_2 = r4.VectorVelocity.Magnitude
-                    local r12 = (r10.Position - r0_2.Position).Magnitude
-                    local r13 = u1070.cache.get_ping()
-                    local r4_2 = r12 / math.max(r5_2, 1) - r13 / 1000
-                    local r6 = math.min(r5_2 / 100, 40)
-                    r6 = 15 - math.min(r12 / 1000, 15) + r6
-
-                    if r5_2 > 1 and r13 / 10 < r4_2 then
-                        r6 = math.max(r6 - 15, 15)
-                    end
-
-                    if r1 == r10 then
-                        break
-                    end
-
-                    if not (r6 < r12) then
-                        break
-                    end
-
-                    u1070.curve_detection.curve_time = u817()
-                    break
-                end
-            end
-        end
-    end)
-end)
-
-u808(function()
-    u1061.AttributeChanged:Connect(function(r0)
-        if r0 == "TimeHoleActivate" then
-            u1070.state.timehole_active = u1061:GetAttribute("TimeHoleActivate") ~= nil
-        end
-    end)
-end)
-
-u808(function()
-    local u1086 = u1084.Remotes.AbilityButtonPress
-    local r1 = u1084.Remotes.Phantom.OnClientEvent
-    local u1087 = r1.Connect
-
-    u1087(r1, function(...)
-        local r9 = {...}
-        local r1 = r9[2]
-
-        if typeof(r1) ~= "Instance" then
-            return
-        end
-
-        if r1.Name ~= u1061.Name then
-            return
-        end
-
-        if not u1070.phantom.enabled then
-            return
-        end
-
-        local r9_2 = u1061.Character
-
-        if not r9_2 then
-            return
-        end
-
-        local r8 = r9_2:FindFirstChild("HumanoidRootPart")
-
-        if not r8 then
-            return
-        end
-
-        local r5 = u1070.phantom.range
-        local r293 = u1070.ball.get_all()
-        local r6
-
-        for r2, r3 in ipairs(r293) do
-            local r7 = (r3.part.Position - r8.Position).Magnitude
-
-            if r7 <= r5 then
-                r5 = r7
-                r6 = r3
-            end
-        end
-
-        if not r6 then
-            return
-        end
-
-        u1070.phantom.active = true
-
-        if u1070.phantom.mode == "Ability" then
-            u1086:Fire()
-
-            task.delay(1, function()
-                u1070.phantom.active = false
-            end)
-        elseif u1070.phantom.mode == "Teleport" then
-            u1070.parry.execute()
-            r8.CFrame = u819.new(r6.part.Position)
-
-            task.delay(0.5, function()
-                u1070.phantom.active = false
-            end)
-        end
-    end)
-end)
-
-local u1088
-
-local function u1089(u1090)
-    if u1088 then
-        u1088:Disconnect()
-        u1088 = nil
-    end
-
-    u1088 = u1090.AttributeChanged:Connect(function(r0)
-        if r0 == "AbilityActive" then
-            local r6 = u1090:GetAttribute("AbilityActive")
-
-            if u1061:GetAttribute("CurrentlyEquippedAbility") == "Slashes of Fury" and r6 == true then
-                u1070.state.slashesoffury_active = true
-            else
-                u1070.state.slashesoffury_active = false
-            end
-        end
-
-        if r0 ~= "FuryCatch" then
-            return
-        end
-
-        if u1090:GetAttribute("FuryCatch") == nil then
-            return
-        end
-
-        if not u1070.detections.slashesoffury then
-            return
-        end
-
-        task.spawn(function()
-            local r0 = 0
-
-            while u1070.state.slashesoffury_active and r0 < u1070.slashesoffury_detection.max_parries and u1070.detections.slashesoffury do
-                r0 = r0 + 1
-                u1070.parry.execute()
-                task.wait(u1070.slashesoffury_detection.parry_delay)
-            end
-        end)
-    end)
-end
-
-if u1061.Character then
-    u808(u1089, u1061.Character)
-end
-
-u1061.CharacterAdded:Connect(function(r0)
-    pcall(u1089, r0)
-end)
 
 local u1091 = u1057
 __S[49] = u1091:WaitForChild("Shared", 9000000000):WaitForChild("ReplicatedInstances", 9000000000):WaitForChild("Swords", 9000000000)
@@ -8518,14 +8992,47 @@ end
 
 u1070.avatar.set_headless = __S[3]
 
-__S[3] = function(r0)
-    return 0.5 + (math.clamp(r0 or u1070.config.accuracy, 1, 100) - 1) * 0.010101010101010102
-end
-
-u1070.parry.get_divisor_multiplier = __S[3]
-
-__S[3] = function(r0, r1)
-    return math.clamp(u1070.cache.get_ping() / 10 / 10, 5, 17) + math.max(r0 / ((2.4 + math.min(math.max(r0 - 9.5, 0), 650) * 0.002) * u1070.parry.get_divisor_multiplier(r1)), 9.5)
+ 
+ 
+__S[3] = function(speed, accuracy)
+    local ping = (u1070.cache.get_parry_ping or u1070.cache.get_ping)()
+    local jitter = math.min(u1070.cache.get_ping_jitter(), 40)
+    local frameAt = u1070.sapphire and u1070.sapphire.State.ParryFrameAt
+    local difference = (ping + math.min(u1066() - (frameAt or u1066()), 0.02) * 1000) / 1000
+    local base = math.clamp(ping / 10 + jitter / 8, 10, 16.7 + jitter / 8)
+    local step = math.clamp(difference * 0.5 - 0.05 + jitter / 2000, 0, 0.04 + jitter / 2000)
+    local inverse = 101 - math.clamp(tonumber(accuracy) or u1070.config.accuracy or 80, 1, 100)
+    local factor = math.clamp((inverse - 1) / 99, 0, 1)
+    local smooth = factor * factor * (3 - 2 * factor)
+    local denominator = 2.4 + math.clamp(speed - 9.5, 0, 990.5) * 0.002
+    local center = speed / denominator * (0.75 + factor * 0.43)
+    local slow = center <= 9.5
+    local compensation = slow and math.min(base, speed * difference) or base + math.min(speed * step, 30)
+    local normal = compensation + math.max(center, 9.5)
+    local radius = normal
+    if inverse > 70 then
+        local blend = math.clamp((inverse - 44) / 30, 0, 1)
+        blend = blend * blend * (3 - 2 * blend)
+        local senderDistance, ballDistance
+        local F = u1070.sapphire
+        local ball = F and F.MainBall()
+        local root = u1070.player.get_root()
+        local alive = workspace:FindFirstChild("Alive")
+        local sender = ball and ball:GetAttribute("from")
+        local character = type(sender) == "string" and alive and alive:FindFirstChild(sender)
+        local otherRoot = character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart"))
+        if root and otherRoot then senderDistance = (root.Position - otherRoot.Position).Magnitude end
+        local part = ball and (ball:IsA("BasePart") and ball or ball.PrimaryPart or ball:FindFirstChild("Body") or ball:FindFirstChild("Corpo"))
+        if root and part then ballDistance = (root.Position - part.Position).Magnitude end
+        local close = senderDistance and math.clamp((8 - senderDistance) / 3, 0, 1) or 0
+        if senderDistance and ballDistance and ballDistance > senderDistance + 3 then close = 0 end
+        local low = (slow and math.min(base, speed * difference) or base) + math.max(speed / denominator * (0.75 + factor * 0.2), 9.5)
+        local high = base + speed / denominator * (1.4 + factor * 0.2)
+        local adjusted = high + math.max(low - high, 0) * math.clamp((speed - 1000) / 800, 0, 1)
+        radius = normal + (adjusted + (low - adjusted) * close - normal) * blend
+    end
+    return radius + math.clamp(tonumber(u1070.config.parry_range) or 0, 0, 10)
+        + (slow and (base - compensation) * (1 - smooth) or 0)
 end
 
 u1070.parry.get_premium_parry_distance = __S[3]
@@ -9403,7 +9910,7 @@ __S[6] = function()
             end
         end
     end
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.ability_esp.update = __S[6]
 
@@ -9460,101 +9967,9 @@ end
 
 u1070.ability_esp.stop = __S[3]
 
-__S[6] = function(v1, v2, v3, v4, v5, v6)
-    if not v3 then
-        local v7 = u1061.Character
-        local v8 = v7 and v7.PrimaryPart
-
-        if not v8 then
-            return false, false
-        end
-
-        v3 = v8.Position
-    end
-
-    if not v4 then
-        local v9 = v1:FindFirstChild("zoomies")
-
-        if not v9 then
-            return false, false
-        end
-
-        v4 = v9.VectorVelocity
-        v5 = v4.Magnitude
-    end
-
-    v5 = v5 or v4.Magnitude
-
-    if v5 < 1 then
-        return false, false
-    end
-
-    local v10 = v1.Position
-    v6 = v6 or (v3 - v10).Magnitude
-    local v11 = 1 / v5
-    local v12, v13 = v4 * v11, (v3 - v10).Unit
-    v3 = v13:Dot(v12)
-    local v14 = v3 < 0
-    v10 = u1070.cache.get_ping()
-    local v15 = v10 * 0.001
-    local v16, v17, v18, v19, v20 = u827.min(v5 * 0.01, 40), v3 > 0 and 40 * v3 or 0, v3 - v13:Dot((v12 - v4).Unit), 0.5 - v15, (v6 * v11 - v15) / 1.5
-    local v21, v22 = 15 - u827.min(v6 * 0.001, 15) + v17 + v16, u1070.curve_detection
-    v17 = v22.per_ball[v1]
-
-    if not v17 then
-        v17 = {vel = {}, last_warping = 0, lerp = 0}
-        v22.per_ball[v1] = v17
-    end
-
-    v1 = v17.vel
-    v16 = #v1
-
-    if v16 >= 4 then
-        v1[1], v1[2], v1[3] = v1[2], v1[3], v1[4]
-        v1[4] = v4
-        v16 = 4
-    else
-        v16 += 1
-        v1[v16] = v4
-    end
-
-    if v6 < (if v5 > 100 and v6 * v11 - v15 > v10 * 0.1 then (u827.max(v21 - 15, 15)) else v21) then
-        return false, v14
-    end
-
-    v5 = u817()
-
-    if v5 - (v22.curve_time or 0) < v20 then
-        return true, v14
-    end
-
-    if v18 < v19 then
-        return true, v14
-    end
-
-    v18 = u827.rad(u827.asin(u827.clamp(v3, -1, 1)))
-    v17.lerp = v17.lerp + (v18 - v17.lerp) * 0.8
-
-    if v17.lerp < 0.018 then
-        v17.last_warping = v5
-    end
-
-    if v5 - v17.last_warping < v20 then
-        return true, v14
-    end
-
-    if v16 == 4 then
-        if v3 - v13:Dot((v12 - v1[1].Unit).Unit) < v19 then
-            return true, v14
-        end
-
-        if v3 - v13:Dot((v12 - v1[2].Unit).Unit) < v19 then
-            return true, v14
-        end
-    end
-
-    return v3 < v19, v14
-end --[[ LPH_NO_VIRTUALIZE ]]
+__S[6] = function(...)
+    return u1070.sapphire.IsCurved(...)
+end
 
 u1070.ball.is_curved = __S[6]
 local u1178
@@ -9602,9 +10017,7 @@ __S[6] = function()
 
     local r1 = u1178.Fire
     local r2 = u1178
-    local r4 = u1070.curve.get_cframe()
-    local r5 = u1070.parry.get_event_data()
-    local r6 = u1070.parry.get_mouse_vec()
+    local r4, r5, r6 = u1070.parry.get_payload()
     return pcall(r1, r2, 0.5, r4, r5, r6, false)
 end
 
@@ -9773,60 +10186,6 @@ __S[3] = function()
                 end
             end
 
-            if u1070.config.auto_parry and u1070.state.parried then
-                local u1185 = task.delay
-
-                u1185(0.15, function()
-                    local r4 = u797:FindFirstChild("Alive")
-                    local r9
-
-                    if r4 then
-                        local r8 = false
-                        local r292 = r4:GetChildren()
-                        r9 = true
-
-                        for r1, r2 in ipairs(r292) do
-                            if r2.Name == u1061.Name then
-                                r9 = true
-                            else
-                                local r7 = u1054:FindFirstChild(r2.Name)
-
-                                if not r7 then
-                                    r9 = false
-                                    r8 = true
-                                    break
-                                end
-
-                                if r7:GetAttribute("CurrentlyEquippedAbility") ~= "Invisibility" then
-                                    r8 = true
-                                    r9 = false
-                                    break
-                                end
-
-                                r8 = true
-
-                                if not r2:GetAttribute("AbilityActive") then
-                                    r9 = false
-                                    r8 = true
-                                    break
-                                end
-
-                                r9 = true
-                            end
-                        end
-
-                        if not r8 then
-                            r9 = false
-                        end
-                    else
-                        r9 = false
-                    end
-
-                    if r9 and #u1070.ball.get_targeted() > 0 then
-                        u1070.state.parried = false
-                    end
-                end)
-            end
         end)
     end
 
@@ -9858,7 +10217,7 @@ __S[6] = function()
             continue
         end
 
-        for v5, v6 in u812(v3:GetChildren()) do
+        for v5, v6 in u812(u1070.runtime_cache.Children(v3)) do
             if v6:GetAttribute("realBall") then
                 u825.insert(v1, {part = v6, model = nil})
                 continue
@@ -9875,7 +10234,7 @@ __S[6] = function()
     end
 
     return v1
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.ball.get_all = __S[6]
 
@@ -9890,7 +10249,7 @@ __S[6] = function()
     end
 
     return v2
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.ball.get_targeted = __S[6]
 
@@ -9910,7 +10269,7 @@ __S[6] = function(v1, v2)
     end
 
     return v1.AssemblyLinearVelocity
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.ball.get_velocity = __S[6]
 
@@ -9934,68 +10293,10 @@ end
 
 u1070.ball.get_first = __S[3]
 
-__S[6] = function(v1, v2)
-    local v3 = u814(v1)
-    local v4 = u1070.curve_detection
 
-    if not u1070.state.ball_tracking[v3] then
-        u1070.state.ball_tracking[v3] = {samples = {}}
-    end
 
-    if not v4.velocity_history[v3] then
-        v4.velocity_history[v3] = {}
-    end
-
-    if not v4.dot_histories[v3] then
-        v4.dot_histories[v3] = {}
-    end
-
-    local v5 = u1070.ball.get_velocity(v1, v2)
-    local v6 = u1070.player.get_root()
-    local v7 = u1070.state.ball_tracking[v3].samples
-    u825.insert(v7, {vel = v5, t = u1066()})
-
-    if #v7 > 20 then
-        u825.remove(v7, 1)
-    end
-
-    v7 = v4.velocity_history[v3]
-    u825.insert(v7, v5)
-
-    if #v7 > 10 then
-        u825.remove(v7, 1)
-    end
-
-    if v6 then
-        v7, v2 = v4.dot_histories[v3], (v6.Position - v1.Position).Unit:Dot(v5.Unit)
-        u825.insert(v7, v2)
-
-        if #v7 > 10 then
-            u825.remove(v7, 1)
-        end
-    end
-end --[[ LPH_NO_VIRTUALIZE ]]
-
-u1070.ball.update_tracking = __S[6]
-
-__S[3] = function(u1186)
-    if u1186:FindFirstChild("AeroDynamicSlashVFX") then
-        pcall(function()
-            u1186.AeroDynamicSlashVFX:Destroy()
-        end)
-
-        u1070.detections.tornado_time = u817()
-    end
-
-    if u1067 and u1067:FindFirstChild("Tornado") then
-        local r3 = u1067.Tornado:GetAttribute("TornadoTime") or 1
-
-        if u817() - u1070.detections.tornado_time < r3 + 0.314159 then
-            return true
-        end
-    end
-
-    return false
+__S[3] = function(...)
+    return u1070.sapphire.CheckTornado(...)
 end
 
 u1070.ball.check_tornado = __S[3]
@@ -10003,7 +10304,7 @@ u1070.ball.check_tornado = __S[3]
 __S[6] = function()
     local v1 = u1061.Character
     return v1 and (v1:FindFirstChild("HumanoidRootPart"))
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.player.get_root = __S[6]
 
@@ -10043,11 +10344,14 @@ end
 
 u1070.player.has_singularity_cape = __S[3]
 
-__S[3] = function()
+__S[3] = function(context)
+    if context and context.Characters then return context.Characters end
     local r4 = u797:FindFirstChild("Alive")
 
     if r4 then
-        return r4:GetChildren()
+        local list = u1070.runtime_cache.Children(r4)
+        if context then context.Characters = list end
+        return list
     end
 
     local r4_2 = {}
@@ -10059,12 +10363,16 @@ __S[3] = function()
         end
     end
 
+    if context then context.Characters = r4_2 end
     return r4_2
 end
 
 u1070.player.get_alive_chars = __S[3]
 
-__S[3] = function()
+__S[3] = function(context)
+    if context and context.ClosestRead then return context.Closest end
+    if context then context.ClosestRead = true end
+    local camera = context and context.Camera or u1062
     if not u1070.player.get_root() then
         return nil
     end
@@ -10079,10 +10387,10 @@ __S[3] = function()
         return nil
     end
 
-    local r0 = u1062:ScreenPointToRay(r6_2.X, r6_2.Y)
+    local r0 = camera:ScreenPointToRay(r6_2.X, r6_2.Y)
     local r8 = u819.lookAt(r0.Origin, r0.Origin + r0.Direction)
     local r9 = -(1/0)
-    local r295 = u1070.player.get_alive_chars()
+    local r295 = u1070.player.get_alive_chars(context)
     local r10
 
     for r1, r2 in ipairs(r295) do
@@ -10090,7 +10398,7 @@ __S[3] = function()
             local r3 = r2:FindFirstChild("HumanoidRootPart")
 
             if r3 then
-                local r4 = r8.LookVector:Dot((r3.Position - u1062.CFrame.Position).Unit)
+                local r4 = r8.LookVector:Dot((r3.Position - camera.CFrame.Position).Unit)
 
                 if r9 < r4 then
                     r9 = r4
@@ -10100,102 +10408,67 @@ __S[3] = function()
         end
     end
 
+    if context then context.Closest = r10 end
     return r10
 end
 
 u1070.player.get_closest_to_cursor = __S[3]
 
-__S[3] = function()
-    if u1070.config.target_player_enabled and u1070.config.target_player_name then
-        local r0 = u1054:FindFirstChild(u1070.config.target_player_name)
-
-        if r0 and r0.Character then
-            local r1 = r0.Character:FindFirstChild("HumanoidRootPart")
-
-            if r1 then
-                return r1.Position
-            end
-        end
-    end
-
-    local r2 = u1070.player.get_closest_to_cursor()
-
-    if r2 then
-        local r1_2 = r2:FindFirstChild("HumanoidRootPart")
-
-        if r1_2 then
-            return r1_2.Position
-        end
-    end
-
-    local r0_2 = u1070.player.get_root()
-
-    if r0_2 then
-        r0_2 = r0_2.Position + u1062.CFrame.LookVector * 100
-    end
-
-    return r0_2
+__S[3] = function(context)
+    local target = u1070.target_player and u1070.target_player.Character()
+    local root = target and u1070.target_player.RootOf(target)
+    if root then return root.Position end
+    local closest = u1070.player.get_closest_to_cursor(context)
+    root = closest and (closest.PrimaryPart or closest:FindFirstChild("HumanoidRootPart"))
+    if root then return root.Position end
+    root = u1070.player.get_root()
+    local camera = u797.CurrentCamera or u1062
+    return root and camera and root.Position + camera.CFrame.LookVector * 1000 or nil
 end
 
 u1070.curve.get_target_pos = __S[3]
 
-__S[3] = function()
-    local r12 = u1070.player.get_root()
-
-    if not r12 then
-        return u1062.CFrame
+__S[3] = function(context)
+     
+    local aim = u1070.target_player and u1070.target_player.GetAim(context)
+    if aim then return aim.Frame end
+    local camera = context and context.Camera or u797.CurrentCamera or u1062
+    if not camera then return u819.new() end
+    local cf = camera.CFrame
+    local character = u1061.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return cf end
+    local position = u1070.curve.get_target_pos(context) or root.Position + cf.LookVector * 1000
+    local offset = position - root.Position
+    local unit = offset.Magnitude > 0.001 and offset.Unit or cf.LookVector
+    local method = u1070.config.curve_method or "camera"
+     
+    if method == "dot" then
+        return u819.lookAt(root.Position, position + Vector3.new(0, 1.75, 0))
+    elseif method == "backwards" then
+        return u819.new(root.Position, root.Position + -unit * 1000)
+    elseif method == "slow" then
+        return u819.new(root.Position, root.Position + Vector3.new(0, -350, 0))
+    elseif method == "random" then
+        return u819.new(root.Position, position + Vector3.new(math.random(-1000, 1000), math.random(-350, 1000), math.random(-1000, 1000)))
     end
-
-    local r13 = u1070.curve.get_target_pos() or r12.Position + u1062.CFrame.LookVector * 100
-    local r7 = u1062.CFrame.RightVector
-    local r1 = Vector3.new(0, 1, 0)
-    local r14 = -(r13 - r12.Position).Unit
-    local r15 = u1070.config.curve_mode
-    local r0 = math.random
-
-    if r15 == 1 then
-        return u1062.CFrame
-    elseif r15 == 2 then
-        local r17 = r0(0, 1) == 0 and -1 or 1
-
-        local r8 = {
-            r14 * r0(7000, 12000) + r7 * (r17 * r0(2000, 5000)) + r1 * r0(3000, 6000),
-            r14 * r0(8000, 15000) + r7 * (r17 * r0(1500, 4000)) + r1 * r0(2000, 5000),
-            r7 * (r17 * r0(8000, 15000)) + r14 * r0(2000, 5000) + r1 * r0(2000, 5000),
-            r7 * (r17 * r0(10000, 18000)) + r14 * r0(1000, 3000) + r1 * r0(1500, 4000),
-            r14 * r0(10000, 18000) + r7 * (r17 * r0(3000, 6000)) + r1 * r0(2500, 5500),
-            r1 * r0(6000, 10000) + r14 * r0(4000, 8000) + r7 * (r17 * r0(2000, 5000))
-        }
-
-        return u819.new(r12.Position, r13 + r8[r0(1, #r8)])
-    elseif r15 == 3 then
-        return u819.new(r12.Position, r13 + Vector3.new(0, 5, 0))
-    elseif r15 == 4 then
-        return u819.new(u1062.CFrame.Position, r12.Position + (r12.Position - r13).Unit * 10000 + Vector3.new(0, 1000, 0))
-    elseif r15 == 5 then
-        return u819.new(r12.Position, r13 + Vector3.new(0, -9e+18, 0))
-    elseif r15 == 6 then
-        return u819.new(r12.Position, r13 + Vector3.new(0, 9e+18, 0))
-    elseif r15 == 7 then
-        local r2 = math.clamp(((r12.Position - r13).Magnitude - 60) * 0.2, -25, 5)
-        local r0_2 = r13 + Vector3.new(0, r2, 0)
-        return u819.new(r12.Position, r0_2)
-    end
-
-    return u1062.CFrame
+    return cf
 end
 
 u1070.curve.get_cframe = __S[3]
 
-__S[3] = function()
+__S[3] = function(context)
+    local aim = u1070.target_player and u1070.target_player.GetAim(context)
+    if aim then return aim.Points end
+    local camera = context and context.Camera or u1062
     local r6 = {}
 
-    if u1070.config.target_player_enabled and u1070.config.target_player_name then
+    if not u1070.target_player and u1070.config.target_player_enabled and u1070.config.target_player_name then
         local u1187 = u1054:FindFirstChild(u1070.config.target_player_name)
 
         if u1187 and u1187.Character and u1187.Character.PrimaryPart then
             local function r5()
-                return u1062:WorldToScreenPoint(u1187.Character.PrimaryPart.Position)
+                return camera:WorldToScreenPoint(u1187.Character.PrimaryPart.Position)
             end
 
             local r4, r5_2 = pcall(r5)
@@ -10208,12 +10481,12 @@ __S[3] = function()
         return r6
     end
 
-    local r291 = u1070.player.get_alive_chars()
+    local r291 = u1070.player.get_alive_chars(context)
 
     for r1, u1188 in ipairs(r291) do
         if u1188.PrimaryPart then
             local function r5_3()
-                return u1062:WorldToScreenPoint(u1188.PrimaryPart.Position)
+                return camera:WorldToScreenPoint(u1188.PrimaryPart.Position)
             end
 
             local r4_2, r5_4 = pcall(r5_3)
@@ -10229,13 +10502,16 @@ end
 
 u1070.parry.get_event_data = __S[3]
 
-__S[3] = function()
+__S[3] = function(context)
+    local aim = u1070.target_player and u1070.target_player.GetAim(context)
+    if aim then return aim.Coordinates end
+    local camera = context and context.Camera or u1062
     if u1070.config.is_mobile then
         local r0 = u1062.ViewportSize
         return {r0.X / 2, r0.Y / 2}
     end
 
-    if u1070.config.target_player_enabled and u1070.config.target_player_name then
+    if not u1070.target_player and u1070.config.target_player_enabled and u1070.config.target_player_name then
         local r0_2 = u1054:FindFirstChild(u1070.config.target_player_name)
 
         if r0_2 and r0_2.Character then
@@ -10243,7 +10519,7 @@ __S[3] = function()
 
             if u1189 then
                 local function r3()
-                    return u1062:WorldToScreenPoint(u1189.Position)
+                    return camera:WorldToScreenPoint(u1189.Position)
                 end
 
                 local r2, r3_2 = pcall(r3)
@@ -10255,14 +10531,14 @@ __S[3] = function()
         end
     end
 
-    local r2_2 = u1070.player.get_closest_to_cursor()
+    local r2_2 = u1070.player.get_closest_to_cursor(context)
 
     if r2_2 then
         local u1190 = r2_2:FindFirstChild("HumanoidRootPart")
 
         if u1190 then
             local function r3_3()
-                return u1062:WorldToScreenPoint(u1190.Position)
+                return camera:WorldToScreenPoint(u1190.Position)
             end
 
             local r2_3, r3_4 = pcall(r3_3)
@@ -10292,6 +10568,14 @@ end
 
 u1070.parry.get_mouse_vec = __S[3]
 
+function u1070.parry.get_payload(context)
+    context = context or {Camera = u797.CurrentCamera or u1062}
+    local frame = u1070.curve.get_cframe(context)
+    local targets = u1070.parry.get_event_data(context)
+    local coordinates = u1070.parry.get_mouse_vec(context)
+    return frame, targets, coordinates
+end
+
 __S[3] = function()
     if u1070.config.parry_mode == "Keypress" then
         u1076()
@@ -10317,7 +10601,7 @@ __S[6] = function(v1)
     if not u1070.parry.fire_remote() then
         u1075()
     end
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.parry.execute_fast = __S[6]
 
@@ -10416,316 +10700,37 @@ end
 
 u1070.parry.try_auto_ability = __S[3]
 
+ 
 __S[6] = function()
-    local v1 = u1070.config
-
-    if not v1.auto_parry then
-        return
-    end
-
-    if u1070.triggerbot.enabled then
-        return
-    end
-
-    if u1070.phantom.active then
-        return
-    end
-
-    local v2 = u1061.Character
-
-    if not v2 then
-        return
-    end
-
-    local v3 = v2:FindFirstChild("HumanoidRootPart")
-
-    if not v3 then
-        return
-    end
-
-    local v4 = v2:FindFirstChildOfClass("Humanoid")
-
-    if not v4 or v4.Health <= 0 then
-        return
-    end
-
-    if v2.PrimaryPart and (v2.PrimaryPart:FindFirstChild("SingularityCape")) then
-        return
-    end
-
-    v2 = u1070.ball.get_targeted()
-
-    if #v2 == 0 then
-        return
-    end
-
-    local v5 = v3.Position
-    local v6 = u1070.state
-    local v7 = u1070.detections
-
-    for v8, v9 in u812(v2) do
-        v8, v4 = v9.part, v9.model
-
-        if v4 then
-            (v4:FindFirstChild("CollisionWhitelist") or v4).Changed:Once(function()
-                v6.parried = false
-            end)
-        else
-            v8:GetAttributeChangedSignal("target"):Once(function()
-                v6.parried = false
-            end)
-        end
-
-        if v6.parried then
-            continue
-        end
-
-        if v8:FindFirstChild("ComboCounter") then
-            continue
-        end
-
-        if u1070.ball.check_tornado(v8) then
-            continue
-        end
-
-        if v7.infinity and v6.infinity_active then
-            continue
-        end
-
-        if v7.deathslash and v6.deathslash_active then
-            continue
-        end
-
-        if v7.slashesoffury and v6.slashesoffury_active then
-            continue
-        end
-
-        if v7.timehole and v6.timehole_active then
-            continue
-        end
-
-        v3 = u1070.ball.get_velocity(v8, v4)
-        local v10, v11 = v3.Magnitude, (v8.Position - v5).Magnitude
-        u1070.ball.update_tracking(v8, v4)
-
-        if v10 >= 40 then
-            local v12, v13 = u1070.ball.is_curved(v8, v4, v5, v3, v10, v11)
-
-            if v12 then
-                continue
-            end
-
-            if v13 then
-                continue
-            end
-        end
-
-        if v11 > u1070.parry.get_premium_parry_distance(v10, v1.accuracy) then
-            continue
-        end
-
-        if v1.randomize_accuracy then
-            v8, v10 = u827.clamp(u827.floor(u827.min(v1.random_accuracy_min, v1.random_accuracy_max)), 1, 100), u827.clamp(u827.floor(u827.max(v1.random_accuracy_min, v1.random_accuracy_max)), 1, 100)
-            v1.accuracy = u827.random(v8, v10)
-        end
-
-        if u1070.parry.try_cooldown_protection() then
-            continue
-        end
-
-        if not u1070.parry.try_auto_ability() then
-            u1070.parry.execute()
-        end
-
-        u1070.parry.mark_attempt()
-        v6.parried = true
-        u1070.spam.parries += 1
-
-        u828.delay(0.5, function()
-            if u1070.spam.parries > 0 then
-                u1070.spam.parries -= 1
-            end
-        end)
-
-        local v14 = u817()
-
-        u828.spawn(function()
-            repeat
-                u1065:Wait()
-            until u817() - v14 >= 1 or not v6.parried
-
-            v6.parried = false
-        end)
-    end
-end --[[ LPH_NO_VIRTUALIZE ]]
+    if u1070.sapphire then return u1070.sapphire.StepAuto() end
+end
 
 u1070.parry.process = __S[6]
 
-__S[6] = function()
-    if not u1070.triggerbot.enabled then
-        return
-    end
-
-    if u1070.player.has_singularity_cape() then
-        return
-    end
-
-    if u1070.triggerbot.is_parrying then
-        return
-    end
-
-    local v1 = u797:FindFirstChild("Balls")
-
-    if not v1 then
-        return
-    end
-
-    for v2, v3 in u812(v1:GetChildren()) do
-        if not v3:IsA("BasePart") then
-            continue
-        end
-
-        if v3:GetAttribute("target") ~= u1061.Name then
-            continue
-        end
-
-        u1070.triggerbot.is_parrying = true
-        u828.spawn(u1070.animation.play_grab)
-        u1070.parry.execute()
-
-        v3:GetAttributeChangedSignal("target"):Once(function()
-            u1070.triggerbot.is_parrying = false
-        end)
-
-        local v4 = u817()
-
-        u828.spawn(function()
-            repeat
-                u1063:Wait()
-            until u817() - v4 >= 1 or not u1070.triggerbot.is_parrying
-
-            u1070.triggerbot.is_parrying = false
-        end)
-
-        break
-    end
-end --[[ LPH_NO_VIRTUALIZE ]]
-
-u1070.triggerbot.process = __S[6]
-
-__S[3] = function(r0)
-    u1070.triggerbot.enabled = r0
-
-    if r0 then
-        if not u1070.triggerbot.connection then
-            u1070.triggerbot.connection = u1063:Connect(u1070.triggerbot.process)
-        end
-    else
-        if u1070.triggerbot.connection then
-            u1070.triggerbot.connection:Disconnect()
-            u1070.triggerbot.connection = nil
-        end
-
-        u1070.triggerbot.is_parrying = false
-    end
+ 
+u1070.triggerbot.process = function()
+    if u1070.sapphire then return u1070.sapphire.StepTrigger() end
+end
+u1070.triggerbot.set = function(enabled)
+    if u1070.sapphire then return u1070.sapphire.SetTriggerEnabled(enabled) end
 end
 
-u1070.triggerbot.set = __S[3]
 
-__S[3] = function()
-    if u1070.spam.connection_manual then
-        u1070.spam.connection_manual:Disconnect()
-    end
-
-    u1070.spam.manual_enabled = true
-
-    local function r2()
-        if not u1070.spam.manual_enabled then
-            return
-        end
-
-        local v1 = u1061.Character
-
-        if not v1 then
-            return
-        end
-
-        local v2 = v1:FindFirstChildOfClass("Humanoid")
-
-        if not v2 or v2.Health <= 0 then
-            return
-        end
-
-        if not v1:FindFirstChild("HumanoidRootPart") then
-            return
-        end
-
-        local v3 = u1070.spam.alive_ref
-
-        if not v3 or v3.Parent ~= u797 then
-            v3 = u797:FindFirstChild("Alive")
-            u1070.spam.alive_ref = v3
-        end
-
-        if not v3 or not v3:FindFirstChild(u1061.Name) then
-            return
-        end
-
-        v3 = u1070.spam.manual_mode
-
-        if v3 == "Remote" and u1070.spam.animation_fix_manual then
-            u1075()
-        end
-
-        u1070.parry.execute_fast(v3)
-    end --[[ LPH_NO_VIRTUALIZE ]]
-
-    u1070.spam.connection_manual = u1065:Connect(r2)
+ 
+u1070.spam.manual_start = function()
+    if u1070.oxy_manual then u1070.oxy_manual.SetManual(true) end
+end
+u1070.spam.manual_stop = function()
+    if u1070.oxy_manual then u1070.oxy_manual.SetManual(false) end
 end
 
-u1070.spam.manual_start = __S[3]
-
-__S[3] = function()
-    u1070.spam.manual_enabled = false
-
-    if not u1070.spam.connection_manual then
-        return
-    end
-
-    u1070.spam.connection_manual:Disconnect()
-
-    u1070.spam.connection_manual = nil
+ 
+u1070.spam.auto_start = function()
+    if u1070.oxy_manual then u1070.oxy_manual.SetAuto(true) end
 end
-
-u1070.spam.manual_stop = __S[3]
-
-__S[3] = function()
-    if u1070.spam.connection_auto then
-        u1070.spam.connection_auto:Disconnect()
-    end
-
-    u1070.spam.auto_enabled = true
-    u1070.spam.parries = 0
-    table.clear(u1070.spam.auto_decay_at)
-    local r4 = u1070.spam.auto_decay_at
-    local r5 = u1070.spam
-    local r0 = u1065:Connect(nil)
+u1070.spam.auto_stop = function()
+    if u1070.oxy_manual then u1070.oxy_manual.SetAuto(false) end
 end
-
-u1070.spam.auto_start = __S[3]
-
-__S[3] = function()
-    u1070.spam.auto_enabled = false
-    u1070.spam.parries = 0
-    table.clear(u1070.spam.auto_decay_at)
-
-    if u1070.spam.connection_auto then
-        u1070.spam.connection_auto:Disconnect()
-        u1070.spam.connection_auto = nil
-    end
-end
-
-u1070.spam.auto_stop = __S[3]
 
 __S[3] = function(r0, r1)
     u1070.player_mods.fov_enabled = r0
@@ -10759,7 +10764,7 @@ __S[3] = function(r0, r1)
             if v2 then
                 v2.WalkSpeed = u1070.player_mods.speed
             end
-        end --[[ LPH_NO_VIRTUALIZE ]]
+        end  
 
         u1070.player_mods.speed_conn = u1063:Connect(r1_2)
     else
@@ -10824,7 +10829,7 @@ __S[3] = function(r0, r1)
             else
                 v2.JumpHeight = u1070.player_mods.jump_power / 5
             end
-        end --[[ LPH_NO_VIRTUALIZE ]]
+        end  
 
         u1070.player_mods.jump_conn = u1063:Connect(r1_2)
     else
@@ -11007,7 +11012,7 @@ __S[6] = function(v1)
         v4.a1.Position = u818.new(u827.cos(v4.baseAngle + v4.angle + u827.pi * 0.7) * v10 + u827.sin(v5 * 1.3) * 0.5, -v4.baseHeight + u827.cos((v4.baseAngle + v4.angle) * 2.5) * 0.8 - v7 - v8 + u827.cos(v5 * 1.7) * 0.5, u827.sin(v4.baseAngle + v4.angle + u827.pi * 0.7) * v10 + u827.cos(v5 * 1.1) * 0.5)
         v4.trail.LightEmission = u827.sin(v2 * 5 + v4.pulseOffset) * 0.4 + 0.6
     end
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.ball_trail.animate = __S[6]
 
@@ -11043,7 +11048,7 @@ __S[3] = function()
         end
 
         u1070.ball_trail.animate(v1)
-    end --[[ LPH_NO_VIRTUALIZE ]]
+    end  
 
     u1070.ball_trail.connection = u1063:Connect(r2)
 end
@@ -11079,13 +11084,111 @@ end
 
 u1070.ball_trail.update_color = __S[3]
 
+ 
+do
+    local B = u1070.ball_velocity
+    local function magnitude(value)
+        if typeof(value) ~= "Vector3" then return nil end
+        local speed = value.Magnitude
+        if speed ~= speed or speed == math.huge then return nil end
+        return speed
+    end
+    local function readVelocity(object, property)
+        if not object then return nil end
+        local ok, value = pcall(function() return object[property] end)
+        return ok and magnitude(value) or nil
+    end
+    function B.ResolvePart(ball)
+        if ball:IsA("BasePart") then return ball end
+        if not ball:IsA("Model") then return nil end
+        for _, name in ipairs({"Corpo", "Body", "HumanoidRootPart"}) do
+            local part = ball:FindFirstChild(name)
+            if part and part:IsA("BasePart") then return part end
+        end
+        local primary = ball.PrimaryPart
+        if primary and primary:IsA("BasePart") then return primary end
+        return ball:FindFirstChildWhichIsA("BasePart", true)
+    end
+    function B.SpeedOf(ball, part, now)
+        local position = part.Position
+        local previous = B.samples[part]
+        local oldPosition, oldTime = previous and previous.Position, previous and previous.Time
+        if previous then previous.Position, previous.Time = position, now
+        else B.samples[part] = {Position = position, Time = now} end
+         
+        local zoomies = ball:FindFirstChild("zoomies") or part:FindFirstChild("zoomies")
+        local speed = readVelocity(zoomies, "VectorVelocity")
+        if speed and speed > 0.001 then return speed end
+        speed = magnitude(ball:GetAttribute("Velocity"))
+        if speed and speed > 0.001 then return speed end
+        if ball ~= part then
+            speed = magnitude(part:GetAttribute("Velocity"))
+            if speed and speed > 0.001 then return speed end
+        end
+        speed = readVelocity(part, "AssemblyLinearVelocity")
+        if speed and speed > 0.001 then return speed end
+        speed = readVelocity(part, "Velocity")
+        if speed and speed > 0.001 then return speed end
+         
+        if previous then
+            local elapsed = now - oldTime
+            if elapsed > 0.001 and elapsed <= 0.5 then
+                return magnitude((position - oldPosition) / elapsed) or 0
+            end
+        end
+        return 0
+    end
+    function B.Sample(now)
+        if not B.active then return 0, B.peak_speed or 0 end
+        B.samples = B.samples or setmetatable({}, {__mode = "k"})
+        B.peak = B.peak or setmetatable({}, {__mode = "k"})
+        local best, bestPriority, current = nil, -1, 0
+        for _, name in ipairs({"Balls", "TrainingBalls"}) do
+            local folder = u797:FindFirstChild(name)
+            if folder then
+                for _, ball in ipairs(u1070.runtime_cache.Children(folder)) do
+                    local part = B.ResolvePart(ball)
+                    local real = ball:GetAttribute("realBall")
+                    if real == nil and part then real = part:GetAttribute("realBall") end
+                    local zoomies = part and (ball:FindFirstChild("zoomies") or part:FindFirstChild("zoomies"))
+                    local target = ball:GetAttribute("target") or (part and part:GetAttribute("target"))
+                    local marked = real == true or zoomies or target or ball:FindFirstChild("TargetAttachment")
+                        or ball:FindFirstChild("CollisionWhitelist") or typeof(ball:GetAttribute("Velocity")) == "Vector3"
+                        or (part and typeof(part:GetAttribute("Velocity")) == "Vector3")
+                    if part and part.Parent and real ~= false and marked then
+                        local speed = B.SpeedOf(ball, part, now)
+                        local peak = math.max(B.peak[ball] or 0, speed)
+                        B.peak[ball] = peak
+                        B.peak_speed = math.max(B.peak_speed or 0, peak)
+                        if u1070.sapphire and type(u1070.sapphire.Target) == "function" then
+                            local ok, resolved = pcall(u1070.sapphire.Target, ball)
+                            if ok and resolved ~= nil then target = resolved end
+                        end
+                        local priority = (target == u1061.Name and 100 or 0) + (name == "Balls" and 10 or 0)
+                        if priority > bestPriority or priority == bestPriority and speed > current then
+                            best, bestPriority, current = ball, priority, speed
+                        end
+                    end
+                end
+            end
+        end
+        B.current_ball, B.current_speed = best, current
+        return current, B.peak_speed or 0
+    end
+end
+
 __S[3] = function()
     if u1070.ball_velocity.active then
         return
     end
 
     u1070.ball_velocity.active = true
-    u1070.ball_velocity.peak = {}
+    u1070.ball_velocity.peak = setmetatable({}, {__mode = "k"})
+    u1070.ball_velocity.samples = setmetatable({}, {__mode = "k"})
+    u1070.ball_velocity.current_ball = nil
+    u1070.ball_velocity.current_speed, u1070.ball_velocity.peak_speed = 0, 0
+    u1070.ball_velocity.last_update = nil
+    u1070.ball_velocity.drag_connections = {}
     local r6 = u858()
     r6.ZIndexBehavior = u824.ZIndexBehavior.Sibling
     local u1193 = u847("Frame")
@@ -11120,7 +11223,7 @@ __S[3] = function()
     r0_5.Position = u821.new(0, 12, 0, 0)
     r0_5.BackgroundTransparency = 1
     r0_5.Text = "Ball Stats"
-    r0_5.TextColor3 = u820.fromRGB(235, 235, 245)
+    r0_5.TextColor3 = u820.fromRGB(235, 234, 239)
     r0_5.TextSize = 13
     r0_5.Font = u824.Font.GothamBold
     r0_5.TextXAlignment = u824.TextXAlignment.Left
@@ -11166,7 +11269,12 @@ __S[3] = function()
     local u1198
     local u1199
 
-    r9.InputBegan:Connect(function(r0)
+    local function listen(signal, callback)
+        local connection = signal:Connect(callback)
+        table.insert(u1070.ball_velocity.drag_connections, connection)
+        return connection
+    end
+    listen(r9.InputBegan, function(r0)
         if r0.UserInputType == u824.UserInputType.MouseButton1 or r0.UserInputType == u824.UserInputType.Touch then
             u1197 = true
             u1198 = r0.Position
@@ -11174,7 +11282,7 @@ __S[3] = function()
         end
     end)
 
-    u1056.InputChanged:Connect(function(r0)
+    listen(u1056.InputChanged, function(r0)
         local r2 = u1197
 
         if u1197 and (r0.UserInputType == u824.UserInputType.MouseMovement or r0.UserInputType == u824.UserInputType.Touch) then
@@ -11183,7 +11291,7 @@ __S[3] = function()
         end
     end)
 
-    u1056.InputEnded:Connect(function(r0)
+    listen(u1056.InputEnded, function(r0)
         if r0.UserInputType == u824.UserInputType.MouseButton1 or r0.UserInputType == u824.UserInputType.Touch then
             u1197 = false
         end
@@ -11192,9 +11300,19 @@ __S[3] = function()
     u1070.ball_velocity.gui = r6
 
     local function r6_2()
+        local stats = u1070.ball_velocity
+        if not stats.active or stats.gui ~= r6 then return end
+        local now = u1066()
+        if stats.last_update and now - stats.last_update < 0.1 then return end
+        stats.last_update = now
+        local current, peak = stats.Sample(now)
+        u1195.Text = string.format("%.1f", current)
+        u1196.Text = string.format("%.1f", peak)
     end
 
+    listen(r6.Destroying, function() u1070.ball_velocity.stop() end)
     u1070.ball_velocity.connection = u1063:Connect(r6_2)
+    r6_2()
 end
 
 u1070.ball_velocity.start = __S[3]
@@ -11205,6 +11323,8 @@ __S[3] = function()
     end
 
     u1070.ball_velocity.active = false
+    for _, connection in ipairs(u1070.ball_velocity.drag_connections or {}) do connection:Disconnect() end
+    u1070.ball_velocity.drag_connections = nil
 
     if u1070.ball_velocity.connection then
         u1070.ball_velocity.connection:Disconnect()
@@ -11217,6 +11337,10 @@ __S[3] = function()
     end
 
     u1070.ball_velocity.peak = {}
+    u1070.ball_velocity.samples = nil
+    u1070.ball_velocity.current_ball = nil
+    u1070.ball_velocity.current_speed, u1070.ball_velocity.peak_speed = 0, 0
+    u1070.ball_velocity.last_update = nil
 end
 
 u1070.ball_velocity.stop = __S[3]
@@ -11416,7 +11540,7 @@ __S[6] = function()
             v12:Destroy()
         end
     end
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.plushies.update = __S[6]
 
@@ -11593,7 +11717,7 @@ __S[6] = function()
         v2.Enabled = true
         v7 = false
     end)
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.winstreak.update = __S[6]
 
@@ -11718,7 +11842,7 @@ __S[6] = function()
             end
         end
     end
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u1070.custom_win.update = __S[6]
 
@@ -11848,6 +11972,10 @@ local function u1210(...)
         return
     end
 
+     
+    local all = u1070.sapphire and u1070.sapphire.PreclickAll
+    if all and all.HandlesKilled() then return end
+
     local v1 = u1070.player.get_root()
 
     if not v1 then
@@ -11894,9 +12022,10 @@ local function u1210(...)
     end
 
     if v5 then
+        if u1070.sapphire then u1070.sapphire.State.PreclickFired = true end
         u808(u1070.parry.execute)
     end
-end --[[ LPH_NO_VIRTUALIZE ]]
+end  
 
 u828.spawn(function()
     local r5 = u1057:WaitForChild("Remotes", 30)
@@ -11916,21 +12045,8217 @@ u828.spawn(function()
     end)
 end)
 
-__S[3] = function()
-    u808(u1070.parry.process)
-end --[[ LPH_NO_VIRTUALIZE ]]
+ 
+ 
+ 
+do
+    local F = {Flags = {}, State = {StaffDetected = {}, AbilityUses = {}}, Connections = {}, Balls = setmetatable({}, {__mode = "k"})}
+    u1070.sapphire = F
+    local flags, sapphireBBState = F.Flags, F.State
+    sapphireBBState.Connections = F.Connections
+    local coroutineFunction = function(key) F.Disconnect(key) end
+    local localPlayer, playersService, replicatedStorage, runService = u1061, u1054, u1057, u1055
+    local features = {Detection = {}, Staff = {}, Phantom = {}, Quasar = {}, Ball = {}}
+    local Workspace = game:GetService("Lighting")
+    local smallest, newRoot, playerGui, CoreGui, PlayerGui
+    local function refresh()
+        smallest = workspace:FindFirstChild("Alive")
+        newRoot = workspace:FindFirstChild("Runtime")
+        playerGui = workspace:FindFirstChild("Balls")
+        CoreGui = workspace:FindFirstChild("TrainingBalls")
+        local gui = localPlayer:FindFirstChildOfClass("PlayerGui")
+        local hotbar = gui and gui:FindFirstChild("Hotbar")
+        local ability = hotbar and hotbar:FindFirstChild("Ability")
+        PlayerGui = ability and ability:FindFirstChild("Duration")
+        return ability, hotbar
+    end
+    refresh()
+    local defaults = {
+        InfinityDetection = false, FreezeDetection = false, DeathSlashDetection = false,
+        DeathSlashMinigame = false, SingularityDetection = false, TimeHoleDetection = false,
+        ForcefieldDetection = false, ParryOnDribble = false, DribbleDetection = false,
+        FuryDetection = false, FurySpamHit = false, FuryParryAmount = 35,
+        FuryParryDelay = 0.05, FuryParryMethod = "Remote",
+        AntiCurveEnabled = true, BackwardsAntiCurveEnabled = true,
+        AntiPhantomEnabled = false, AntiPhantomBlatant = false, AntiPhantomType = "Spam",
+        AntiFlashCounterEnabled = false, AntiFlashCounterBlatant = false, AntiFlashCounterType = "Spam",
+        AntiBlindness = false, AntiDisorientate = false, StaffDetection = false, StaffDetectionMode = "warn"
+    }
+    for key, value in pairs(defaults) do flags[key] = value end
+    function F.Disconnect(key)
+        local conn = F.Connections[key]
+        if conn then conn:Disconnect(); F.Connections[key] = nil end
+    end
+    local function connect(key, signal, callback)
+        F.Disconnect(key)
+        F.Connections[key] = signal:Connect(function(...)
+            if not F.Destroyed then callback(...) end
+        end)
+        return F.Connections[key]
+    end
+    local function previous() return (u1070.cache.get_parry_ping or u1070.cache.get_ping)() end
+    local function pingJitterMs() return u1070.cache.get_ping_jitter and u1070.cache.get_ping_jitter() or 0 end
+    local function normalizeVector() return previous() / 1000 end
+    local function compareFunction(ball)
+        if not ball then return nil end
+        local target = ball:GetAttribute("target")
+        if target and target ~= "" then return target end
+        local attachment = ball:FindFirstChild("TargetAttachment")
+        local value = attachment and attachment.Value
+        local model = value and value:FindFirstAncestorWhichIsA("Model")
+        local visited = {}
+        while model and not visited[model] do
+            visited[model] = true
+            local actual = model:FindFirstChild("ActualCharacter")
+            if not actual or not actual.Value then break end
+            model = actual.Value
+        end
+        local whitelist = ball:FindFirstChild("CollisionWhitelist")
+        if not model and whitelist and whitelist.Value then model = whitelist.Value end
+        return model and model.Name
+    end
+    F.Target = compareFunction
+    local function executeFunction(ball)
+        if not ball then return nil end
+        return ball:IsA("BasePart") and ball or ball:IsA("Model") and (ball.PrimaryPart or ball:FindFirstChild("Body") or ball:FindFirstChild("Corpo"))
+    end
+    local function unexecuteFunction(ball)
+        local part = executeFunction(ball)
+        return part and part.Position or Vector3.zero
+    end
+    local function index4(ball)
+        if not ball then return Vector3.zero end
+        local zoomies = ball:FindFirstChild("zoomies")
+        if zoomies then return zoomies.VectorVelocity end
+        local velocity = ball:GetAttribute("Velocity")
+        if typeof(velocity) == "Vector3" then return velocity end
+        local part = executeFunction(ball)
+        return part and u1070.ball.get_velocity(part, ball:IsA("Model") and ball or nil) or Vector3.zero
+    end
+    local function index5(ball)
+        return ball and ((ball:IsA("BasePart") and ball:GetAttribute("realBall")) or
+            (ball:IsA("Model") and executeFunction(ball) and (ball:FindFirstChild("CollisionWhitelist") or ball:FindFirstChild("TargetAttachment"))))
+    end
+    local function index6(ball)
+         
+         
+        return ball and ball:IsA("Model") and executeFunction(ball) and not ball:FindFirstChild("zoomies")
+    end
+    local function index7(ball)
+        local state = F.Balls[ball]
+        if not state then
+            state = {Target = compareFunction(ball), CurveVersion = 0, Connections = {}}
+            F.Balls[ball] = state
+        end
+        return state
+    end
+    local function updateFunction(name)
+        refresh()
+        local char = localPlayer.Character
+        local abilities = char and char:FindFirstChild("Abilities")
+        local ability = abilities and abilities:FindFirstChild(name)
+        return localPlayer:GetAttribute("CurrentlyEquippedAbility") == name and ability and ability.Enabled and PlayerGui and PlayerGui.Visible
+    end
+    local function abilityReady()
+        local ability = refresh()
+        local grad = ability and ability:FindFirstChildOfClass("UIGradient")
+        return grad and grad.Offset.Y >= 0.49
+    end
+    local function fireAbility()
+        local remotes = replicatedStorage:FindFirstChild("Remotes")
+        local ability = remotes and remotes:FindFirstChild("AbilityButtonPress")
+        if not ability then return false end
+        local ok = pcall(function()
+            if ability:IsA("BindableEvent") then ability:Fire()
+            elseif ability:IsA("RemoteEvent") then ability:FireServer() end
+        end)
+        return ok
+    end
+    local function continuation(char)
+        return char and sapphireBBState.InvisibilityCharacter == char and os.clock() < (sapphireBBState.InvisibilityUntil or 0)
+    end
+    function F.InvisDetection(char)
+        refresh()
+        if not smallest then return false end
+        local found = false
+        for _, other in smallest:GetChildren() do
+            if other ~= char then
+                if not continuation(other) then return false end
+                found = true
+            end
+        end
+        return found
+    end
+    local index9, index10, index11, index12, index13, index14, index15
+    local index17
 
-u1063:Connect(__S[3])
+index9 = function(key)local y= localPlayer .Character;local currentLength=y and(y.PrimaryPart or(y:FindFirstChild("HumanoidRootPart")));y= smallest and  smallest .Parent and  smallest or(workspace:FindFirstChild("Alive"));local deltaX=type(key)=="string"and y and(y:FindFirstChild(key));key=deltaX and(deltaX.PrimaryPart or(deltaX:FindFirstChild("HumanoidRootPart")));y=currentLength and key and currentLength.Position-key.Position;return y and y.Magnitude>0.001 and y or nil;end
+index10 = function(key,callback)local currentLength=callback.Zoomies;local velocity= compareFunction (key);if not  flags .BackwardsAntiCurveEnabled or not currentLength or key.Parent== CoreGui or velocity== localPlayer .Name then return;end;if key:GetAttribute("DribbleActive")==true then callback.CurveReference=nil;return;end;key=currentLength.VectorVelocity;velocity=key.Magnitude;if velocity~=velocity or velocity==math.huge or velocity<0.001 then return;end;callback.CurveReference=key;end
+index11 = function(key,callback,relativeVelocity,scale)if not  flags .BackwardsAntiCurveEnabled or not key or key.Parent== CoreGui or( index6 (key))then return false;end;if(relativeVelocity or( compareFunction (key)))~= localPlayer .Name then return false;end;local toTarget,length= index7 (key),callback.Magnitude;if length~=length or length==math.huge or length<0.001 then return false;end;local current,currentIndex,currentNode=toTarget.CurveSource,toTarget.CurveTargetDirection,key:GetAttribute("from");if scale and(not current or not currentIndex)then if type(currentNode)=="string"and currentNode~=""and currentNode~= localPlayer .Name then current,currentIndex=currentNode,( index9 (currentNode));end;end;if not current or currentNode~=current or not currentIndex then return false;end;key=currentIndex.Magnitude;if key<0.001 then return false;end;relativeVelocity=toTarget.CurveReference;local x,progress=relativeVelocity and relativeVelocity.Magnitude or 0,currentIndex:Dot(callback)/(key*length);if x<0.001 then return scale and length>=35 and progress<-0.45;end;scale,currentNode=relativeVelocity:Dot(callback)/(x*length),false;if scale>0.2 and progress>=-0.45 and progress<0 then local normal= index9 (current);local deltaY=normal and normal.Magnitude or 0;if deltaY>0.001 then local distance=normal:Dot(callback)/(deltaY*length);currentNode=scale>0.95 and progress<-0.2 and distance<-0.2;if distance<progress then progress,key,currentIndex=distance,deltaY,normal;end;end;end;local normal=currentNode or scale>0.2 and progress<-0.45;if not normal and(math.abs(currentIndex.Y)>key*0.1 or scale>0.2 and progress<-0.2)then local i,deltaY,distance=Vector3.new(relativeVelocity.X,0,relativeVelocity.Z),Vector3.new(callback.X,0,callback.Z),Vector3.new(currentIndex.X,0,currentIndex.Z);local y,currentLength,currentIndex=i.Magnitude,deltaY.Magnitude,distance.Magnitude;if y>x*0.35 and currentLength>length*0.35 and currentIndex>0.001 then normal=i:Dot(deltaY)/(y*currentLength)>0.2 and distance:Dot(deltaY)/(currentIndex*currentLength)<-0.45;if normal and currentIndex<=1 then currentNode= index9 (current);local deltaX=currentNode and(Vector3.new(currentNode.X,0,currentNode.Z));local i=deltaX and deltaX.Magnitude or 0;normal=i>0.001 and deltaX:Dot(deltaY)<-0.45*i*currentLength;end;end;end;if not normal and progress>0.2 and scale<0 then toTarget.CurveReference=nil;end;
+    local ahora=os.clock()
+    local score=math.clamp((toTarget.BackwardsScore or 0)*0.62+(normal and 1 or 0)*0.38,0,1)
+    toTarget.BackwardsScore=score
+    if score>=0.55 then toTarget.BackwardsAt=ahora;return true;end;if toTarget.BackwardsAt and ahora-toTarget.BackwardsAt<0.045 then return true;end;return false ;end
+
+index12 = function(line)
+	local serialized = line.Connections
+	local conn = serialized and serialized.CurveVelocity
+
+	if conn then
+		conn:Disconnect()
+		serialized.CurveVelocity = nil
+	end
+
+	line.CurveReference = nil
+	line.CurveSource = nil
+	line.CurveTargetDirection = nil
+	line.CurveReady = nil
+	line.CurveVersion = (line.CurveVersion or 0) + 1
+end
+
+index13 = function(line)
+	line.CurveTime = os.clock()
+	line.CurveWarping = nil
+end
+
+index14 = function(line)
+	line.CurveTime = nil
+	line.CurveWarping = nil
+end
+
+index15 = function(line, object, descendant, radius, zCoordinate, alpha, color, initialCapacity, targetPosition)
+	if not flags.AntiCurveEnabled or not line or line.Parent == CoreGui or index6(line) then
+		return false
+	end
+
+	if (initialCapacity or compareFunction(line)) ~= localPlayer.Name then
+		return false
+	end
+
+	radius = radius or index4(line)
+	alpha = alpha or radius.Magnitude
+	if alpha ~= alpha or alpha == math.huge or alpha < 0.001 then
+		return false
+	end
+
+	if not object then
+		object = localPlayer.Character
+
+		if object then
+			object = object:FindFirstChild("HumanoidRootPart") or object.PrimaryPart
+		end
+	end
+
+	if not object then
+		return false
+	end
+
+	if not color then
+		color = object.Position - (descendant or unexecuteFunction(line))
+	end
+
+	zCoordinate = zCoordinate or color.Magnitude
+	if zCoordinate ~= zCoordinate or zCoordinate == math.huge or zCoordinate < 0.001 then
+		return false
+	end
+
+	local radians = index7(line)
+	local osClock = os.clock()
+	local pingTime = math.max(targetPosition or normalizeVector() or 0, 0)
+	local ballPosition = descendant or (object.Position - color)
+	local aheadVector = object.Position - (ballPosition + radius * pingTime)
+	local aheadDistance = aheadVector.Magnitude
+
+	if aheadDistance < 0.001 then
+		radians.CurveWarping = nil
+		radians.CurveTime = nil
+		return false
+	end
+
+	local closing = aheadVector:Dot(radius) / (aheadDistance * alpha)
+	local eta = aheadDistance / alpha
+	local reach = 10 + alpha * pingTime
+
+	if aheadDistance < reach then
+		radians.CurveWarping = nil
+		radians.CurveTime = nil
+		return false
+	end
+
+	if closing < 0.45 then
+		radians.CurveWarping = osClock
+	end
+
+	local warping = radians.CurveWarping
+
+	if warping then
+		local window = math.min(math.max(eta, 0.12), 0.4 + pingTime * 0.5)
+
+		if osClock - warping < window then
+			return true
+		end
+
+		radians.CurveWarping = nil
+		radians.CurveTime = nil
+	end
+
+	return false
+end
+
+features.Detection.GetDribbleBall = function(line)
+	local cell = not flags.ParryOnDribble or not line or not index5(line) or line:GetAttribute("DribbleActive") ~= true
+
+	if not cell then
+		local targetPlayerName = localPlayer.Name
+		cell = compareFunction(line) == targetPlayerName
+	end
+
+	if cell then
+		return
+	end
+	local radians = playerGui
+	local angleRadians
+
+	if playerGui then
+		angleRadians = radians
+	else
+		angleRadians = workspace:FindFirstChild("Balls")
+	end
+
+	if not angleRadians then
+		return
+	end
+
+	for _, propertyName in angleRadians:GetChildren() do
+		if propertyName ~= line and propertyName.Name == line.Name and not index5(propertyName) and propertyName:GetAttribute("highlighted") == true then
+			return line
+		end
+	end
+end
+
+features.Detection.GetSelfDribbleBall = function(player14, line)
+	if not flags.DribbleDetection then
+		sapphireBBState.SelfDribbleBall = nil
+		sapphireBBState.SelfDribbleAway = nil
+		return nil, false
+	end
+
+	local cell = not player14.Parent or not index5(player14) or player14:GetAttribute("DribbleActive") ~= true
+	local active
+
+	if cell then
+		active = cell
+	else
+		local targetPlayerName = localPlayer.Name
+		active = compareFunction(player14) ~= targetPlayerName
+	end
+
+	if active then
+		if sapphireBBState.SelfDribbleBall == player14 then
+			sapphireBBState.SelfDribbleBall = nil
+			sapphireBBState.SelfDribbleAway = nil
+		end
+
+		return nil, false
+	end
+
+	if sapphireBBState.SelfDribbleBall ~= player14 then
+		sapphireBBState.SelfDribbleBall = player14
+		sapphireBBState.SelfDribbleAway = false
+	end
+
+	local isArray = (line.Position - unexecuteFunction(player14)):Dot(index4(player14)) > 0
+
+	if not isArray then
+		sapphireBBState.SelfDribbleAway = true
+	end
+
+	return player14, sapphireBBState.SelfDribbleAway and isArray
+end
+
+features.Detection.TrackAbilityUse = function(line, object, descendant, quantity, radius)
+	local index51 = workspace:GetServerTimeNow()
+	local lines = sapphireBBState.AbilityUses[line]
+
+	if not lines or lines.Ability ~= descendant or lines.Character ~= object then
+		lines = { Ability = descendant, Character = object, Recoveries = {} }
+		sapphireBBState.AbilityUses[line] = lines
+	end
+
+	for k = #lines.Recoveries, 1, -1 do
+		if lines.Recoveries[k] <= index51 then
+			table.remove(lines.Recoveries, k)
+		end
+	end
+
+	lines.Maximum = quantity
+
+	if #lines.Recoveries < quantity then
+		lines.Recoveries[#lines.Recoveries + 1] = index51 + radius
+	end
+end
+
+index17 = function(line, object)
+	local cell = flags.FreezeDetection and line:GetAttribute("Frozen") == true
+
+	if cell then
+		cell = (object or compareFunction(line)) == localPlayer.Name
+	end
+
+	local active
+
+	if cell then
+		active = not (false)
+	else
+		active = cell
+	end
+
+	return active
+end
+
+features.Detection.BlocksParry = function(line, object, descendant)
+	local explosion = descendant or object and object:FindFirstChild("HumanoidRootPart")
+	if not explosion then
+		return true
+	end
+
+	if line and index17(line) then
+		return true
+	end
+	local player25 = newRoot and newRoot:FindFirstChild("Tornado")
+
+	if player25 then
+		local callbackFunction = player25:GetAttribute("TornadoTime")
+
+		if sapphireBBState.Tornado ~= player25 or sapphireBBState.TornadoDuration ~= callbackFunction or not sapphireBBState.TornadoAt then
+			sapphireBBState.Tornado = player25
+			sapphireBBState.TornadoDuration = callbackFunction
+			sapphireBBState.TornadoAt = tick()
+		end
+
+		local index56 = sapphireBBState.TornadoAt
+		if tick() - index56 < (callbackFunction or 1) + 0.314159 then
+			return true
+		end
+	elseif sapphireBBState.Tornado then
+		sapphireBBState.Tornado = nil
+		sapphireBBState.TornadoDuration = nil
+		sapphireBBState.TornadoAt = nil
+	end
+
+	if flags.SingularityDetection and explosion:FindFirstChild("SingularityCape") then
+		return true
+	end
+
+	if flags.FuryDetection and (sapphireBBState.FuryCatch or sapphireBBState.FuryActive) then
+		return true
+	end
+
+	if flags.DeathSlashDetection and sapphireBBState.DeathSlash then
+		return true
+	end
+	local rootPart = object:FindFirstChild("Abilities")
+	local result76 = PlayerGui and PlayerGui.Visible
+	local effectInstance = rootPart and rootPart:FindFirstChild("Time Hole")
+	if flags.TimeHoleDetection and (sapphireBBState.TimeHole or result76 and effectInstance and effectInstance.Enabled) then
+		return true
+	end
+
+	if flags.InfinityDetection and (sapphireBBState.InfinityActive or updateFunction("Infinity")) then
+		return true
+	end
+
+	if flags.ForcefieldDetection and updateFunction("Forcefield") and (explosion:FindFirstChild("MaxShield") or explosion:FindFirstChild("Shield")) then
+		return true
+	end
+	return false, rootPart
+end
+
+features.Staff = {
+	Group = 12836673,
+	Roles = {
+	Mod = true,
+	Support = true,
+	Admin = true,
+	Developer = true,
+	["Lead Developer"] = true,
+	Management = true,
+	Executive = true,
+	["Co-Owner"] = true,
+	Contributor = true,
+	["Trial QA"] = true,
+	Holder = true,
+},
+}
+
+
+
+features.Staff.Check = function(line)
+	if F.Destroyed or not flags.StaffDetection or line == localPlayer then
+		return
+	end
+
+	if sapphireBBState.StaffDetected[line] or line.Parent ~= playersService then
+		return
+	end
+	local decoded, loadError = pcall(line.GetRoleInGroup, line, features.Staff.Group)
+
+	if not F.Destroyed and flags.StaffDetection and decoded and features.Staff.Roles[loadError] then
+		sapphireBBState.StaffDetected[line] = true
+		local query = "Staff Detected: " .. line.Name .. " | " .. loadError
+
+		if flags.StaffDetectionMode == "kick" then
+			localPlayer:Kick(query)
+		else
+			u864.SendNotification({title = "Staff Detection", text = query, duration = 15})
+		end
+	end
+end
+
+features.Staff.Set = function(line)
+	coroutineFunction("Staff")
+	if not line then
+		coroutineFunction("Staff")
+		table.clear(sapphireBBState.StaffDetected)
+		return
+	end
+
+	for _, particle in playersService:GetPlayers() do
+		features.Staff.Check(particle)
+	end
+
+	sapphireBBState.Connections.Staff = playersService.PlayerAdded:Connect(function(player9)
+			task.wait(1)
+
+			if flags.StaffDetection then
+				features.Staff.Check(player9)
+			end
+		end)
+end
+
+
+features.Phantom = {}
+
+features.Phantom.Reset = function()
+	sapphireBBState.PhantomTarget = nil
+	sapphireBBState.PhantomAbility = nil
+	sapphireBBState.PhantomData = nil
+end
+
+features.Phantom.Trigger = function(line, options, object)
+	local gameProcessed, low, priority
+
+	if line == "Phantom" then
+		gameProcessed = flags.AntiPhantomEnabled
+		low = flags.AntiPhantomBlatant
+		priority = flags.AntiPhantomType
+	else
+		gameProcessed = flags.AntiFlashCounterEnabled
+		low = flags.AntiFlashCounterBlatant
+		priority = flags.AntiFlashCounterType
+	end
+
+	if not gameProcessed then
+		return
+	end
+
+	if object ~= localPlayer.Character or typeof(options) ~= "Instance" or not options:IsA("Model") then
+		return
+	end
+	sapphireBBState.PhantomTarget = options
+	sapphireBBState.PhantomAbility = nil
+
+	sapphireBBState.PhantomData = {
+		Name = line,
+		Blatant = low,
+		Type = priority,
+		Ball = line == "Phantom" and features.Ball.GetMainBall() or nil,
+		Expires = os.clock() + 1.25,
+	}
+end
+
+features.Phantom.Released = function(expectedType)
+	local ENT = sapphireBBState.PhantomData
+	local innerPlayer = sapphireBBState.PhantomTarget
+	if not ENT or ENT.Name ~= "Phantom" or not innerPlayer or ENT.Ball and ENT.Ball ~= expectedType then
+		return false
+	end
+	local targetPlayerName = innerPlayer.Name
+
+	if compareFunction(expectedType) ~= targetPlayerName then
+		ENT.Position = nil
+		ENT.Released = false
+		return false
+	end
+
+	ENT.Ball = expectedType
+	local radians = unexecuteFunction(expectedType)
+
+	if ENT.Position and radians ~= ENT.Position then
+		ENT.Released = true
+	end
+
+	ENT.Position = radians
+	return ENT.Released == true
+end
+
+features.Phantom.Update = function()
+	local ENT = sapphireBBState.PhantomData
+	local innerPlayer = sapphireBBState.PhantomTarget
+	local model = localPlayer.Character
+	model = model and model:FindFirstChild("HumanoidRootPart")
+	local explosion = innerPlayer and innerPlayer:FindFirstChild("HumanoidRootPart")
+	local targetHumanoid = innerPlayer and innerPlayer:FindFirstChildOfClass("Humanoid")
+	local cell = not ENT
+
+	if not cell then
+		local neighborX = ENT.Expires
+		cell = os.clock() >= neighborX
+	end
+
+	if cell or not model or not explosion or not targetHumanoid or targetHumanoid.Health <= 0 then
+		features.Phantom.Reset()
+		return
+	end
+	local difference = model.Position - explosion.Position
+	local exponent = difference.Magnitude
+
+	if ENT.Blatant and exponent < 32 then
+		model.CFrame = model.CFrame + (exponent > 0.1 and difference.Unit or -explosion.CFrame.LookVector) * (32 - exponent)
+		features.Phantom.Reset()
+		return
+	end
+
+	return innerPlayer, exponent, ENT
+end
+
+
+features.Quasar.Reset = function()
+	sapphireBBState.QuasarUntil = nil
+end
+
+features.Quasar.ClearBlindness = function(line)
+	local blindness = Workspace:FindFirstChild("Blindness")
+	if blindness and not blindness:IsA("Atmosphere") then pcall(function() blindness.Enabled = false end) end
+
+	if not line then
+		for _, particle in Workspace:GetChildren() do
+			if particle:IsA("Atmosphere") and particle.Name == "Blindness" then
+				features.Quasar.ClearBlindness(particle)
+			end
+		end
+
+		return
+	end
+
+	local projectile = sapphireBBState.QuasarAtmosphere
+	line.Density = projectile and projectile.Density or 0
+	line.Offset = projectile and projectile.Offset or 0
+	line.Haze = projectile and projectile.Haze or 0
+	line.Glare = projectile and projectile.Glare or 0
+
+	if projectile then
+		line.Color = projectile.Color
+		line.Decay = projectile.Decay
+	end
+end
+
+features.Quasar.SetBlindness = function(line)
+	local atmosphere = line and Workspace:FindFirstChildWhichIsA("Atmosphere")
+    sapphireBBState.QuasarAtmosphere = atmosphere and {
+        Density = atmosphere.Density, Offset = atmosphere.Offset, Haze = atmosphere.Haze,
+        Glare = atmosphere.Glare, Color = atmosphere.Color, Decay = atmosphere.Decay
+    } or nil
+end
+
+features.Quasar.SetDisorientate = function(line)
+	coroutineFunction("Quasar Camera")
+	sapphireBBState.QuasarCamera = nil
+	if not line then
+		return
+	end
+
+	sapphireBBState.Connections["Quasar Camera"] = runService.PreRender:Connect(function()
+			local bodyGyro = workspace.CurrentCamera
+
+			if bodyGyro then
+				sapphireBBState.QuasarCamera = bodyGyro.CFrame
+			end
+		end)
+end
+
+
+
+    F.Detection, F.Staff, F.Phantom, F.Quasar = features.Detection, features.Staff, features.Phantom, features.Quasar
+    function F.Set(key, value)
+         
+        if key == "AntiCurveEnabled" or key == "BackwardsAntiCurveEnabled" then
+            flags[key] = true
+            return
+        end
+        if key == "FuryParryMethod" then value = u864.normalize_parry_method(value) end
+        flags[key] = value
+        if key == "StaffDetection" then features.Staff.Set(value)
+        elseif key == "AntiBlindness" then features.Quasar.SetBlindness(value)
+        elseif key == "AntiDisorientate" then features.Quasar.SetDisorientate(value)
+        elseif (key == "AntiPhantomEnabled" and not value and sapphireBBState.PhantomData and sapphireBBState.PhantomData.Name == "Phantom") or
+               (key == "AntiFlashCounterEnabled" and not value and sapphireBBState.PhantomData and sapphireBBState.PhantomData.Name == "Flash Counter") then
+            features.Phantom.Reset()
+        elseif key == "DribbleDetection" and not value then
+            sapphireBBState.SelfDribbleBall = nil; sapphireBBState.SelfDribbleAway = nil
+        end
+    end
+    function F.MainBall()
+        local first
+        for _, item in ipairs(u1070.ball.get_all()) do
+            local ball = item.model or item.part
+            first = first or ball
+            if compareFunction(ball) == localPlayer.Name then return ball end
+        end
+        return first
+    end
+    features.Ball.GetMainBall = F.MainBall
+    function F.Fire(method)
+        if F.Destroyed then return false end
+        method = u864.normalize_parry_method(method)
+        local char = localPlayer.Character
+        local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 then return false end
+        local ok, success = pcall(function()
+            if method == "Remote" then
+                if u1070.parry.fire_remote() then return true end
+                u1075()
+            else u1075() end
+            return true
+        end)
+        if ok and success and u1070.oxy_manual then u1070.oxy_manual.RecordSend() end
+        return ok and success
+    end
+    local function validChar()
+        refresh()
+        local char = localPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        return char and hum and hum.Health > 0 and char.Parent == smallest and char or nil
+    end
+    local function onInfinityEnd()
+        if sapphireBBState.InfinityParried or not flags.InfinityDetection then return end
+        local ball, char = F.MainBall(), validChar()
+        local root = char and (char.PrimaryPart or char:FindFirstChild("HumanoidRootPart"))
+        if not ball or not root or compareFunction(ball) ~= localPlayer.Name or (unexecuteFunction(ball) - root.Position).Magnitude > 10 then return end
+        if not u1070.config.auto_parry and not u1070.triggerbot.enabled then return end
+        sapphireBBState.InfinityParried = F.Fire(u1070.config.parry_mode)
+        if sapphireBBState.InfinityParried then
+            local state = index7(ball)
+            state.ParryResetAt = os.clock() + 0.6
+            u1070.state.parried = true
+            task.delay(0.6, function() if not F.Destroyed then u1070.state.parried = false end end)
+        end
+    end
+    local function doDeathSlashMinigame()
+        local frame
+        while not F.Destroyed and flags.DeathSlashDetection and flags.DeathSlashMinigame and sapphireBBState.DeathSlash do
+            local gui = localPlayer:FindFirstChildOfClass("PlayerGui")
+            local timer = gui and gui:FindFirstChild("DeathSlashTimer")
+            frame = timer and timer:FindFirstChild("Frame")
+            if frame and frame.Visible then break end
+            runService.PreRender:Wait()
+        end
+        if not frame or not frame.Visible then return end
+        local image, circle, inner = frame:FindFirstChild("ImageLabel"), frame:FindFirstChild("Circle"), frame:FindFirstChild("Inner")
+        local threshold = circle and inner and (circle.Size.X.Scale + inner.Size.X.Scale) / 2
+        while not F.Destroyed and flags.DeathSlashDetection and flags.DeathSlashMinigame and sapphireBBState.DeathSlash and frame.Parent and frame.Visible and image and threshold do
+            if image.Size.X.Scale <= threshold then fireAbility(); return end
+            runService.PreRender:Wait()
+        end
+    end
+    function F.CheckTornado()
+        refresh()
+        local tornado = newRoot and newRoot:FindFirstChild("Tornado")
+        if tornado then
+            local duration = tornado:GetAttribute("TornadoTime")
+            if sapphireBBState.Tornado ~= tornado or sapphireBBState.TornadoDuration ~= duration or not sapphireBBState.TornadoAt then
+                sapphireBBState.Tornado, sapphireBBState.TornadoDuration, sapphireBBState.TornadoAt = tornado, duration, tick()
+            end
+            return tick() - sapphireBBState.TornadoAt < (tonumber(duration) or 1) + 0.314159
+        end
+        sapphireBBState.Tornado, sapphireBBState.TornadoDuration, sapphireBBState.TornadoAt = nil, nil, nil
+        return false
+    end
+    function F.BlocksParry(ball, char, root)
+        refresh()
+        char = char or localPlayer.Character
+        root = root or char and (char.PrimaryPart or char:FindFirstChild("HumanoidRootPart"))
+        if not char or not root then return true end
+        if continuation(char) then return true end
+         
+        return features.Detection.BlocksParry(ball, char, root)
+    end
+    function F.GetTargets()
+        local found = {}
+        local root = u1070.player.get_root()
+        for _, item in ipairs(u1070.ball.get_all()) do
+            local ball = item.model or item.part
+            local target = compareFunction(ball)
+            local selfBall, returned = nil, false
+            if root then selfBall, returned = features.Detection.GetSelfDribbleBall(ball, root) end
+            local otherDribble = features.Detection.GetDribbleBall(ball) == ball
+            if target == localPlayer.Name or otherDribble or (selfBall and returned) then
+                 
+                if not (selfBall and not returned) then table.insert(found, item) end
+            end
+        end
+        return found
+    end
+    function F.IsCurved(part, model, position, velocity, speed, distance)
+        local ball = model or part
+        local root = u1070.player.get_root()
+        if not root then return false, false end
+        velocity = velocity or index4(ball)
+        speed = speed or velocity.Magnitude
+        local toTarget = (position or root.Position) - unexecuteFunction(ball)
+        distance = distance or toTarget.Magnitude
+        local target = compareFunction(ball)
+        if features.Detection.GetDribbleBall(ball) == ball then return false, false end
+        local _, returned = features.Detection.GetSelfDribbleBall(ball, root)
+        if returned then return false, false end
+        local anti = index15(ball, root, unexecuteFunction(ball), velocity, distance, speed, toTarget, target, normalizeVector())
+        local backwards = index11(ball, velocity, target, true)
+        return anti, backwards
+    end
+    local function disconnectBall(ball)
+        if F.OnAutoBallRemoved then F.OnAutoBallRemoved(ball) end
+        local state = F.Balls[ball]
+        if state then
+            for _, conn in pairs(state.Connections) do conn:Disconnect() end
+            F.Balls[ball] = nil
+        end
+        if sapphireBBState.SelfDribbleBall == ball then
+            sapphireBBState.SelfDribbleBall, sapphireBBState.SelfDribbleAway = nil, nil
+        end
+    end
+    local function trackBall(ball)
+        if not ball:IsA("BasePart") and not ball:IsA("Model") then return end
+        if F.Balls[ball] and F.Balls[ball].Tracked then return end
+        local state = index7(ball)
+        state.Tracked = true
+        state.LoopTarget = state.Target
+        state.Parried, state.ParryResetAt = false, 0
+        state.Zoomies = ball:FindFirstChild("zoomies")
+        state.AutoFrom = ball:GetAttribute("from")
+        state.AutoFromVersion = state.AutoFrom == localPlayer.Name and (state.AutoCycleVersion or 0) or nil
+        local function captureVelocity()
+            index10(ball, state)
+            if compareFunction(ball) == localPlayer.Name then
+                local ready = state.CurveReady
+                state.CurveReady = true
+                if not ready and F.QueueAuto and u1070.config.auto_parry then F.QueueAuto() end
+            end
+        end
+        local function attachVelocity(zoomies)
+            if state.Connections.Velocity then state.Connections.Velocity:Disconnect(); state.Connections.Velocity = nil end
+            state.Zoomies = zoomies
+            if zoomies then
+                state.Connections.Velocity = zoomies:GetPropertyChangedSignal("VectorVelocity"):Connect(captureVelocity)
+                captureVelocity()
+            end
+        end
+        local function targetChanged()
+            local target, old = compareFunction(ball), state.Target
+            if target == old then return end
+            state.Target, state.ParryResetAt = target, 0
+            state.Parried = false
+            state.CurveVersion += 1
+            u1070.state.parried = false
+            if target == localPlayer.Name then
+                index13(state)
+                if ball:GetAttribute("DribbleActive") == true then state.CurveReference = nil end
+                state.CurveSource = type(old) == "string" and old ~= "" and old ~= localPlayer.Name and old or nil
+                state.CurveTargetDirection = index9(state.CurveSource)
+                state.CurveReady = nil
+                local velocity, reference = index4(ball), state.CurveReference
+                local direction = state.CurveTargetDirection
+                if not reference or reference.Magnitude < 0.001 or (velocity.Magnitude >= 0.001 and (reference:Dot(velocity) <= 0 or direction and direction:Dot(velocity) >= 0)) then
+                    state.CurveReady = true
+                end
+            else
+                index14(state)
+                state.CurveReference, state.CurveSource, state.CurveTargetDirection, state.CurveReady = nil, nil, nil, nil
+                index10(ball, state)
+            end
+            if F.OnAutoTargetChanged then F.OnAutoTargetChanged(ball, state, target, old) end
+            if F.OnTriggerTargetChanged then F.OnTriggerTargetChanged(ball, state, target) end
+        end
+        state.Connections.Target = ball:GetAttributeChangedSignal("target"):Connect(targetChanged)
+        state.Connections.TriggerFrom = ball:GetAttributeChangedSignal("from"):Connect(function()
+            if F.OnAutoFromChanged then F.OnAutoFromChanged(ball, state) end
+            if F.OnTriggerBallAvailable and u1070.triggerbot.ignore_spawn then F.OnTriggerBallAvailable(ball) end
+        end)
+        state.Connections.TriggerEligibility = ball:GetAttributeChangedSignal("realBall"):Connect(function()
+            if F.OnTriggerBallAvailable then F.OnTriggerBallAvailable(ball) end
+        end)
+        local attachment = ball:FindFirstChild("TargetAttachment") or ball:FindFirstChild("CollisionWhitelist")
+        if attachment then state.Connections.TargetValue = attachment.Changed:Connect(targetChanged) end
+        state.Connections.ChildAdded = ball.ChildAdded:Connect(function(child)
+            if child.Name == "zoomies" then attachVelocity(child) end
+            if child.Name == "ComboCounter" then F.StartFuryCounter(child) end
+            if F.OnTriggerBallAvailable then F.OnTriggerBallAvailable(ball) end
+        end)
+        state.Connections.ChildRemoved = ball.ChildRemoved:Connect(function(child)
+            if child == state.Zoomies then attachVelocity(nil); state.CurveReady = true end
+        end)
+        attachVelocity(state.Zoomies)
+        local counter = ball:FindFirstChild("ComboCounter")
+        if counter then F.StartFuryCounter(counter) end
+        if F.QueueAuto and u1070.config.auto_parry then F.QueueAuto() end
+        if F.OnTriggerBallAvailable then F.OnTriggerBallAvailable(ball) end
+    end
+    F.FuryCounters = setmetatable({}, {__mode = "k"})
+    function F.StartFuryCounter(counter)
+        if F.FuryCounters[counter] or not flags.FuryDetection or not sapphireBBState.FuryCatch then return end
+        F.FuryCounters[counter] = true
+        task.spawn(function()
+            local label = counter:FindFirstChildOfClass("TextLabel")
+            if not label then F.FuryCounters[counter] = nil; return end
+            sapphireBBState.FuryActive = true
+            local count, pending, method = tonumber(label.Text) or 0, {}, flags.FuryParryMethod
+            local lastAcknowledged = count
+            while not F.Destroyed and flags.FuryDetection and sapphireBBState.FuryCatch and counter:IsDescendantOf(workspace) do
+                local began = os.clock()
+                local selected, acknowledged = flags.FuryParryMethod, tonumber(label.Text)
+                if acknowledged then
+                    if selected ~= method then
+                        table.clear(pending); count, lastAcknowledged, method = acknowledged, acknowledged, selected
+                    end
+                    if selected == "Remote" then count = math.max(count, acknowledged)
+                    else
+                        for _ = 1, math.min(math.max(acknowledged - lastAcknowledged, 0), #pending) do table.remove(pending, 1) end
+                        while pending[1] and began >= pending[1] do table.remove(pending, 1) end
+                        lastAcknowledged = math.max(lastAcknowledged, acknowledged)
+                        count = lastAcknowledged + #pending
+                    end
+                    if flags.FurySpamHit and count < flags.FuryParryAmount and F.Fire(selected) then
+                        count += 1
+                        if selected ~= "Remote" then pending[#pending + 1] = os.clock() + math.max(0.15, normalizeVector() + 0.001) end
+                    end
+                end
+                local delay = flags.FuryParryDelay or 0.05
+                task.wait(selected == "Remote" and delay or math.max(delay - (os.clock() - began), 0))
+            end
+            sapphireBBState.FuryActive, sapphireBBState.FuryCatch = false, false
+            F.FuryCounters[counter] = nil
+        end)
+    end
+    local function furyCatch()
+        sapphireBBState.FuryCatch, sapphireBBState.FuryActive = true, false
+        refresh()
+        if playerGui then
+            for _, ball in playerGui:GetChildren() do
+                local counter = ball:FindFirstChild("ComboCounter")
+                if counter then F.StartFuryCounter(counter) end
+            end
+        end
+    end
+    local function detectFuryAbility()
+        local char = validChar()
+        local abilities = char and char:FindFirstChild("Abilities")
+        local ability = abilities and abilities:FindFirstChild("Slashes of Fury")
+        local gui = localPlayer:FindFirstChildOfClass("PlayerGui")
+        local hotbar = gui and gui:FindFirstChild("Hotbar")
+        local button = hotbar and hotbar:FindFirstChild("Ability")
+        local red = button and button:FindFirstChild("Red")
+        refresh()
+        if flags.FuryDetection and ability and ability.Enabled and red and not red.Visible and playerGui and #playerGui:GetChildren() > 0 then furyCatch() end
+    end
+    local function watchFolder(folder)
+        if F.WatchedFolders[folder] then return end
+        F.WatchedFolders[folder] = true
+        for _, ball in folder:GetChildren() do trackBall(ball) end
+        connect(folder, folder.ChildAdded, trackBall)
+        connect("remove:" .. folder.Name, folder.ChildRemoved, disconnectBall)
+    end
+    F.WatchedFolders = setmetatable({}, {__mode = "k"})
+    local function resetCharacter()
+        sapphireBBState.InfinityActive, sapphireBBState.InfinityParried = false, false
+        sapphireBBState.TimeHole, sapphireBBState.FuryCatch, sapphireBBState.FuryActive, sapphireBBState.DeathSlash = false, false, false, false
+        sapphireBBState.Tornado, sapphireBBState.TornadoAt = nil, nil
+        sapphireBBState.InvisibilityCharacter, sapphireBBState.InvisibilityUntil = nil, nil
+        sapphireBBState.SelfDribbleBall, sapphireBBState.SelfDribbleAway = nil, nil
+        features.Phantom.Reset(); features.Quasar.Reset()
+        u1070.state.parried = false
+        for _, state in pairs(F.Balls) do index12(state); index14(state) end
+        if F.AutoAnimation then F.AutoAnimation.Reset(true); F.AutoAnimation.WatchCharacter() end
+        if F.ResetAutoState then F.ResetAutoState() end
+        if F.ResetTriggerTokens then F.ResetTriggerTokens() end
+    end
+    local function bindEvent(instance)
+        local name = instance.Name
+        if F.EventBound[instance] then return end
+        local callbacks = F.RemoteCallbacks
+        local callback = callbacks[name]
+        if not callback then return end
+        local signal
+        if instance:IsA("RemoteEvent") or instance:IsA("UnreliableRemoteEvent") then signal = instance.OnClientEvent
+        elseif instance:IsA("BindableEvent") then signal = instance.Event end
+        if signal then
+            F.EventBound[instance] = true
+            connect(instance, signal, callback)
+        end
+    end
+    F.EventBound = setmetatable({}, {__mode = "k"})
+    F.RemoteCallbacks = {
+        InfinityBall = function(_, active)
+            local old = sapphireBBState.InfinityActive
+            if active then
+                if updateFunction("Infinity") then sapphireBBState.InfinityActive, sapphireBBState.InfinityParried = true, false end
+            elseif old then sapphireBBState.InfinityActive = false; task.defer(onInfinityEnd) end
+        end,
+        DeathBall = function(player, active)
+            if player ~= localPlayer and player ~= localPlayer.Name then return end
+            local old = sapphireBBState.DeathSlash
+            sapphireBBState.DeathSlash = active == true
+            if active and not old and flags.DeathSlashDetection and flags.DeathSlashMinigame then task.spawn(doDeathSlashMinigame) end
+        end,
+        ["RE/TimeHoleActivate"] = function(player)
+            if player == localPlayer or player == localPlayer.Name then sapphireBBState.TimeHole = true end
+        end,
+        ["RE/TimeHoleDeactivate"] = function() sapphireBBState.TimeHole = false end,
+        ["RE/SlashesOfFuryCatch"] = furyCatch,
+        ["RE/SlashesOfFuryEnd"] = function() sapphireBBState.FuryCatch, sapphireBBState.FuryActive = false, false end,
+        AbilityButtonPress = detectFuryAbility,
+        ActivateAbility = function(char, data)
+            if typeof(char) == "Instance" and char:GetAttribute("Ability") == "Phantom" then
+                features.Phantom.Trigger("Phantom", char, type(data) == "table" and data.target)
+            end
+        end,
+        PlrFlashCountered = function(char, target) features.Phantom.Trigger("Flash Counter", char, target) end,
+        VisualBindableCD = function()
+            if localPlayer:GetAttribute("CurrentlyEquippedAbility") == "Phantom" then
+                sapphireBBState.InvisibilityCharacter, sapphireBBState.InvisibilityUntil = localPlayer.Character, os.clock() + 3
+            end
+        end,
+        PlrQuasared = function(player, target)
+            if target ~= localPlayer.Character then return end
+            local upgrades = typeof(player) == "Instance" and player:FindFirstChild("Upgrades")
+            local quasar = upgrades and upgrades:FindFirstChild("Quasar")
+            sapphireBBState.QuasarUntil = os.clock() + 5 + (quasar and quasar.Value or 0)
+            if flags.AntiBlindness then features.Quasar.ClearBlindness() end
+            local saved = flags.AntiDisorientate and sapphireBBState.QuasarCamera
+            if saved then task.defer(function()
+                local camera = workspace.CurrentCamera
+                if camera and flags.AntiDisorientate and not F.Destroyed then camera.CFrame = CFrame.new(camera.CFrame.Position) * saved.Rotation end
+            end) end
+        end
+    }
+     
+    local function lightingChild(child)
+        if child.Name == "Blindness" and not child:IsA("Atmosphere") then
+            local ok, signal = pcall(function() return child:GetPropertyChangedSignal("Enabled") end)
+            if ok then connect(child, signal, function()
+                if flags.AntiBlindness and os.clock() < (sapphireBBState.QuasarUntil or 0) and child.Enabled then child.Enabled = false end
+            end) end
+        elseif child:IsA("Atmosphere") then
+            if flags.AntiBlindness and child.Name == "Blindness" and os.clock() < (sapphireBBState.QuasarUntil or 0) then features.Quasar.ClearBlindness(child)
+            elseif child.Name ~= "Blindness" then sapphireBBState.QuasarAtmosphere = child end
+        end
+    end
+    function F.UpdatePhantom()
+        if not flags.AntiPhantomEnabled and not flags.AntiFlashCounterEnabled then return end
+        local char, distance, data = features.Phantom.Update()
+        if not char or data.Blatant then return end
+        if data.Type == "Ability" then
+            if sapphireBBState.PhantomAbility ~= char and abilityReady() then sapphireBBState.PhantomAbility = char; fireAbility() end
+            return
+        end
+        if F.BlocksParry(nil) then return end
+        local root = u1070.player.get_root()
+        if not root then return end
+        local ball = data.Ball or F.MainBall()
+        if not ball then return end
+        if data.Name == "Phantom" and (distance > 30 or not features.Phantom.Released(ball)) then return end
+         
+        local speed = index4(ball).Magnitude
+        if (unexecuteFunction(ball) - root.Position).Magnitude <= u1070.parry.get_premium_parry_distance(speed, u1070.config.accuracy) then
+            if os.clock() - (F.PhantomParryAt or 0) >= 1 / 60 then
+                F.PhantomParryAt = os.clock(); F.Fire(u1070.config.parry_mode)
+            end
+        end
+    end
+    function F.Destroy()
+        if F.Destroyed then return end
+        if F.PreclickAll then F.PreclickAll.Stop() end
+        if F.Predictive then F.Predictive.Reset() end
+        if F.ResetAutoState then F.ResetAutoState() elseif F.Decision then F.Decision.Reset() end
+        if u1070.cache.floxy_ping then u1070.cache.floxy_ping.Destroy() end
+        if u1070.ball_velocity and u1070.ball_velocity.stop then u1070.ball_velocity.stop() end
+        if F.AutoAnimation then F.AutoAnimation.Reset(true) end
+        if u1070.sapphire_misc then u1070.sapphire_misc.Destroy() end
+        if u1070.target_player then u1070.target_player.Destroy() end
+        if u1070.oxy_manual then u1070.oxy_manual.Destroy() end
+        if u1070.runtime_cache then u1070.runtime_cache.Destroy() end
+        F.Destroyed = true
+        u1070.triggerbot.enabled, u1070.triggerbot.connection = false, nil
+        for key in pairs(F.Connections) do F.Disconnect(key) end
+        local balls = {}
+        for ball in pairs(F.Balls) do table.insert(balls, ball) end
+        for _, ball in ipairs(balls) do disconnectBall(ball) end
+        table.clear(sapphireBBState.StaffDetected)
+        features.Phantom.Reset()
+    end
+
+     
+     
+    local managerObject = F.Balls
+    local top, currentDate, elapsedTime, packed = false, nil, 0, nil
+    local attemptAutoParry
+    local function isInTrainingArea(char)
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local lobby = workspace:FindFirstChild("LobbyTraining", true)
+        local area = lobby and lobby:FindFirstChild("TrainingArea")
+        if not root or not area or not area:IsA("BasePart") then return false end
+        local point, half = area.CFrame:PointToObjectSpace(root.Position), area.Size * 0.5
+        return math.abs(point.X) <= half.X and math.abs(point.Y) <= half.Y and math.abs(point.Z) <= half.Z
+    end
+    local function undoFunction(char)
+        return char and char.PrimaryPart and (char.Parent == smallest or isInTrainingArea(char))
+    end
+    local function redoFunction(ball, part, now)
+         
+         
+        return nil
+    end
+    local function onInputEnded(ball, position, ballPosition, velocity)
+        local offset = position - (ballPosition or unexecuteFunction(ball))
+        local distance = offset.Magnitude
+        if distance < 0.001 then return 0, 0 end
+        local projected = offset:Dot(velocity or index4(ball))
+        if projected <= 0 then return math.huge, distance end
+        return distance * distance / projected, distance
+    end
+    F.TimeToImpact = onInputEnded
+     
+    do
+        local function initializePredictiveTiming()
+            local P = {Frame = 1 / 60, FrameSamples = {}}
+            F.Predictive = P
+            local function finite(value)
+                return type(value) == "number" and value == value and math.abs(value) < 1e8
+            end
+            local function vector(value)
+                return typeof(value) == "Vector3" and finite(value.X) and finite(value.Y) and finite(value.Z)
+            end
+            function P.Clear(state) state.Predictive = nil end
+            function P.Reset()
+                P.Frame = 1 / 60
+                table.clear(P.FrameSamples)
+                for _, state in pairs(F.Balls) do P.Clear(state) end
+            end
+            function P.Observe(delta)
+                if finite(delta) and delta >= 0.001 and delta <= 0.1 then
+                    if #P.FrameSamples >= 9 then table.remove(P.FrameSamples, 1) end
+                    table.insert(P.FrameSamples, delta)
+                    local sorted = table.clone(P.FrameSamples)
+                    table.sort(sorted)
+                    local target = sorted[math.ceil(#sorted / 2)]
+                    if #sorted < 5 then target = math.min(target, P.Frame * 1.5) end
+                    P.Frame += (target - P.Frame) * 0.2
+                end
+            end
+            function P.SetEnabled(enabled)
+                u1070.config.predictive_timing = enabled == true
+                P.Reset()
+            end
+            function P.Credit(speed, step, accuracyError, multiple, minimum, normal, center)
+                 
+                if center <= 9.5 then return 0 end
+                local lead = math.min(speed * step, 30)
+                if accuracyError <= 70 or multiple and accuracyError > 44 and normal >= minimum then return lead end
+                local blend = math.clamp((accuracyError - 44) / 30, 0, 1)
+                blend = blend * blend * (3 - 2 * blend)
+                return lead * (1 - blend)
+            end
+            local function linearEntry(relative, motion, radius)
+                local c = relative:Dot(relative) - radius * radius
+                if c <= 0 then return 0 end
+                local a, b = motion:Dot(motion), relative:Dot(motion)
+                if a < 1e-12 or b >= 0 then return nil end
+                local discriminant = b * b - a * c
+                if discriminant < 0 then return nil end
+                return c / (-b + math.sqrt(discriminant))
+            end
+            function P.SweptEntry(relative, motion, acceleration, radius, horizon)
+                if acceleration.Magnitude < 0.001 then return linearEntry(relative, motion, radius) end
+                if relative.Magnitude <= radius then return 0 end
+                local function point(t) return relative + motion * t + acceleration * (0.5 * t * t) end
+                local interval = horizon / 8
+                 
+                 
+                local inset = acceleration.Magnitude * interval * interval / 8 + 1e-7
+                local innerRadius = math.max(0, radius - inset)
+                local start = relative
+                for i = 1, 8 do
+                    local finishTime = interval * i
+                    local finish = point(finishTime)
+                    local fraction = linearEntry(start, finish - start, innerRadius)
+                    if fraction and fraction <= 1 then
+                        local low = finishTime - interval
+                        local high = low + interval * fraction
+                        if point(high).Magnitude <= radius then
+                            if point(low).Magnitude <= radius then return low end
+                            for _ = 1, 14 do
+                                local middle = (low + high) * 0.5
+                                if point(middle).Magnitude <= radius then high = middle else low = middle end
+                            end
+                            return high
+                        end
+                    end
+                    start = finish
+                end
+                return nil
+            end
+            function P.Evaluate(state, ball, target, root, position, velocity, radius, credit, ping, now)
+                if not root or not vector(root.Position) or not vector(position) or not finite(radius) then
+                    P.Clear(state); return false, nil
+                end
+                local legacy = (root.Position - position).Magnitude <= radius
+                if F.Destroyed or u1070.config.predictive_timing ~= true then return legacy, nil end
+                if not vector(position) or not vector(velocity) or not vector(root.Position)
+                    or not finite(radius) or radius <= 0 or not finite(credit) or not finite(ping) then
+                    P.Clear(state); return legacy, nil
+                end
+                if target ~= localPlayer.Name then P.Clear(state); return false, nil end
+                local playerVelocity = root.AssemblyLinearVelocity
+                if not vector(playerVelocity) or playerVelocity.Magnitude > 500 then playerVelocity = Vector3.zero end
+                local relative = position - root.Position
+                local motion = velocity - playerVelocity
+                local distance, speed = relative.Magnitude, motion.Magnitude
+                if not finite(speed) or speed > 1e6 then P.Clear(state); return legacy, nil end
+                local old = state.Predictive
+                local dt = old and now - old.At or 0
+                local continuous = old and old.Ball == ball and old.Target == target and old.Root == root
+                    and old.Version == state.CurveVersion and dt >= 0.001 and dt <= 0.15
+                if continuous then
+                    local expected = old.Position + old.Velocity * dt
+                    local playerExpected = old.PlayerPosition + old.PlayerVelocity * dt
+                    if (position - expected).Magnitude > math.max(25, old.Velocity.Magnitude * dt)
+                        or (root.Position - playerExpected).Magnitude > 15 then continuous = false end
+                    local oldSpeed = old.Motion.Magnitude
+                    if speed > 0.01 and oldSpeed > 0.01 and (motion / speed):Dot(old.Motion / oldSpeed) < 0.95 then continuous = false end
+                end
+                 
+                local sameSnapshot = old and old.Ball == ball and old.Target == target and old.Root == root
+                    and old.Version == state.CurveVersion and dt >= 0 and dt < 0.001
+                    and old.Position == position and old.PlayerPosition == root.Position and old.Velocity == velocity and old.PlayerVelocity == playerVelocity
+                local sample = sameSnapshot and old or (continuous and old or {})
+                local acceleration = sameSnapshot and old.Acceleration or Vector3.zero
+                local count = sameSnapshot and old.Count or 1
+                local confidence = sameSnapshot and old.Confidence or 0.5
+                local evidence = sameSnapshot and old.Evidence or 1
+                local pending = sameSnapshot and old.PendingAcceleration or nil
+                local anchorAt = sameSnapshot and old.AnchorAt or now
+                local anchor = sameSnapshot and old.Anchor or relative
+                local integral = sameSnapshot and old.Integral or Vector3.zero
+                if continuous then
+                    local observed = (position - root.Position) - (old.Position - old.PlayerPosition)
+                    local expected = (motion + old.Motion) * (dt * 0.5)
+                    local tolerance = math.max(0.15, expected.Magnitude * 0.3)
+                    local instantEvidence = 1 - math.clamp((observed - expected).Magnitude / tolerance, 0, 1)
+                     
+                     
+                    anchorAt, anchor = old.AnchorAt, old.Anchor
+                    integral = old.Integral + expected
+                    evidence, confidence = old.Evidence, old.Confidence
+                    if now - anchorAt >= 0.04 then
+                        local errorDistance = ((relative - anchor) - integral).Magnitude
+                        evidence = 1 - math.clamp(errorDistance / math.max(0.4, integral.Magnitude * 0.4), 0, 1)
+                        confidence = confidence * 0.5 + evidence * 0.5
+                        anchorAt, anchor, integral = now, relative, Vector3.zero
+                    end
+                    local change = motion - old.Motion
+                    local measured = change / dt
+                    local previous = old.PendingAcceleration
+                    local consistent = previous and previous.Magnitude > 0.001 and measured.Magnitude > 0.001
+                        and measured:Dot(previous) / (measured.Magnitude * previous.Magnitude) >= 0.7
+                        and measured.Magnitude >= previous.Magnitude * 0.25 and measured.Magnitude <= previous.Magnitude * 4
+                     
+                     
+                    if change.Magnitude > math.max(1, speed * 0.015) and instantEvidence >= 0.6 then
+                        pending = measured
+                        acceleration = consistent and old.Acceleration * 0.6 + measured * 0.4 or old.Acceleration * 0.5
+                    else
+                        pending = nil; acceleration = old.Acceleration * 0.5
+                    end
+                    count = math.min(old.Count + 1, 8)
+                end
+                sample.Ball, sample.Target, sample.Root, sample.Version = ball, target, root, state.CurveVersion
+                sample.At, sample.Position, sample.PlayerPosition = now, position, root.Position
+                sample.Velocity, sample.PlayerVelocity, sample.Motion = velocity, playerVelocity, motion
+                sample.Acceleration, sample.Count = acceleration, count
+                sample.Confidence, sample.Evidence, sample.PendingAcceleration = confidence, evidence, pending
+                sample.AnchorAt, sample.Anchor, sample.Integral = anchorAt, anchor, integral
+                state.Predictive = sample
+                local baseRadius = math.max(1, radius - math.max(0, credit))
+                local frame = math.clamp(P.Frame, 0.004, 0.033)
+                local creditedTime = speed > 0.01 and math.max(credit, 0) / speed or 0
+                 
+                local horizon = math.clamp(creditedTime + frame, 0.004, 0.12)
+                if count < 2 then horizon = math.min(horizon, creditedTime + math.min(frame, 0.02)) end
+                local applied = count >= 3 and confidence >= 0.5 and evidence >= 0.6 and acceleration or Vector3.zero
+                local maxAcceleration = speed * 0.15 / horizon
+                if applied.Magnitude > maxAcceleration and applied.Magnitude > 0.001 then
+                    applied = applied / applied.Magnitude * maxAcceleration
+                end
+                sample.AppliedAcceleration = applied
+                sample.BaseRadius, sample.Horizon = baseRadius, horizon
+                local function decision(allowed, eta, reason)
+                    sample.Allowed, sample.ETA, sample.Reason = allowed, eta, reason
+                    return allowed, eta
+                end
+                 
+                if legacy and distance <= math.min(baseRadius, 12) then return decision(true, 0, "close") end
+                if speed < 0.01 then return decision(legacy, nil, "stationary") end
+                if count >= 2 and confidence < 0.4 then return decision(legacy, nil, "uncertain motion") end
+                if relative:Dot(motion) >= 0 then return decision(false, nil, "receding") end
+                local a, b = motion:Dot(motion), relative:Dot(motion)
+                if a < 1e-6 or b >= 0 then return decision(false, nil, "turning away") end
+                local eta = P.SweptEntry(relative, motion, applied, baseRadius, horizon)
+                if not eta then return decision(false, nil, "miss") end
+                 
+                local extension = math.min(20, speed * 0.04)
+                if distance > radius + extension then return decision(false, eta, "outside envelope") end
+                 
+                 
+                local activeWindow = math.max(0, 0.5 - math.max(ping, 0) / 2000)
+                if distance > radius and -b / a > activeWindow then return decision(false, eta, "too early") end
+                return decision(eta <= horizon, eta, eta <= horizon and "entry" or "waiting")
+            end
+        end
+        initializePredictiveTiming()
+    end
+     
+    do
+        local function initializeAutoDecision()
+            local D = {Generation = 0, Receipts = {}}
+            F.Decision = D
+            function D.Vector(value)
+                if typeof(value) ~= "Vector3" then return false end
+                local x, y, z = value.X, value.Y, value.Z
+                return x == x and y == y and z == z and math.abs(x) < 1e8 and math.abs(y) < 1e8 and math.abs(z) < 1e8
+            end
+            function D.ReadRaw(ball)
+                local ok, position, velocity, part = pcall(function()
+                    local body = executeFunction(ball)
+                    if not body then return nil end
+                    return body.Position, index4(ball), body
+                end)
+                if ok and D.Vector(position) and D.Vector(velocity) then return position, velocity, part end
+                return nil
+            end
+            function D.Read(ball, scan)
+                if not scan then return D.ReadRaw(ball) end
+                if scan.Generation ~= D.Generation or scan.Character ~= localPlayer.Character
+                    or not scan.Character or scan.Character.PrimaryPart ~= scan.Root then return nil end
+                if not scan.Samples then scan.Samples = {} end
+                local sample = scan.Samples[ball]
+                local state = F.Balls[ball]
+                if sample and state and sample.Cycle ~= state.AutoCycleVersion then sample = nil end
+                if sample == nil then
+                    local position, velocity, part = D.ReadRaw(ball)
+                    if scan.Generation ~= D.Generation then return nil end
+                    if position then
+                        local effective, source = D.Motion(ball, position, velocity, part, scan)
+                        sample = {Position = position, RawVelocity = velocity, Velocity = effective, Source = source,
+                            Part = part, Parent = ball.Parent, Cycle = index7(ball).AutoCycleVersion}
+                    else sample = false end
+                    scan.Samples[ball] = sample
+                end
+                if sample then return sample.Position, sample.Velocity, sample.Part end
+                return nil
+            end
+            function D.PlayerVelocity(root)
+                local velocity = root.AssemblyLinearVelocity
+                return D.Vector(velocity) and velocity:Dot(velocity) <= 250000 and velocity or Vector3.zero
+            end
+            function D.Frame(root, network)
+                if not D.Vector(root.Position) then return nil end
+                 
+                return {Root = root, Character = localPlayer.Character, RootPosition = root.Position,
+                    PlayerVelocity = D.PlayerVelocity(root), At = os.clock(), Generation = D.Generation, Network = network}
+            end
+            function D.SameVector(a, b)
+                return D.Vector(a) and D.Vector(b) and a.X == b.X and a.Y == b.Y and a.Z == b.Z
+            end
+            function D.SenderMatches(expected, sender, allowOwn)
+                if sender == expected or allowOwn and sender == localPlayer.Name then return true end
+                if sender == nil or sender == "" then return true end
+                if expected == nil or expected == "" then return type(sender) == "string" and sender ~= localPlayer.Name end
+                return false
+            end
+            function D.Motion(ball, position, velocity, part, scan)
+                if scan.Generation ~= D.Generation or scan.Character ~= localPlayer.Character
+                    or not scan.Character or scan.Character.PrimaryPart ~= scan.Root then return velocity, "native" end
+                local state = index7(ball)
+                local now, target = scan.At, compareFunction(ball)
+                local sender = ball:GetAttribute("from")
+                if type(sender) ~= "string" or sender == "" then sender = nil end
+                local m = state.Motion
+                 
+                if m and now < m.Seen then return velocity, "native" end
+                if not m or m.Character ~= scan.Character or m.Root ~= scan.Root or m.Part ~= part
+                    or m.Parent ~= ball.Parent or m.Target ~= target or now - m.Seen > 0.25
+                    or sender and sender ~= m.Sender and (m.Sender ~= nil or sender == localPlayer.Name) then
+                    m = {Character = scan.Character, Root = scan.Root, Part = part, Parent = ball.Parent, Target = target, Sender = sender,
+                        Position = position, At = now, Seen = now, Raw = velocity, RawAt = now, Count = 0}
+                    state.Motion = m
+                    return velocity, "native"
+                end
+                 
+                if sender then m.Sender = sender end
+                local rawDelta = velocity - m.Raw
+                if rawDelta:Dot(rawDelta) > math.max(16, m.Raw:Dot(m.Raw) * 0.0225) then
+                    m.Raw, m.RawAt, m.Count, m.Estimate = velocity, now, 0, nil
+                end
+                m.Seen = now
+                local delta, dt = position - m.Position, now - m.At
+                if m.Estimate and dt >= 0 and dt < 0.008 then
+                    local distance2, speed2 = delta:Dot(delta), m.Estimate:Dot(m.Estimate)
+                    local projection = delta:Dot(m.Estimate)
+                    if distance2 > math.max(0.0025, speed2 * dt * dt * 0.0625)
+                        and (projection <= 0 or projection * projection < distance2 * speed2 * 0.25) then
+                         
+                         
+                        m.Position, m.At, m.Count, m.Estimate, m.Measured = position, now, 0, nil, nil
+                        return velocity, "native"
+                    end
+                end
+                if delta:Dot(delta) > 0.000001 and dt >= 0.008 then
+                    local measured = delta / dt
+                    local speed2 = measured:Dot(measured)
+                    if dt <= 0.2 and speed2 >= 4 and speed2 <= 144000000 then
+                        local previous = m.Measured
+                        local previous2 = previous and previous:Dot(previous) or 0
+                        local agreement = previous2 > 0 and measured:Dot(previous) / math.sqrt(speed2 * previous2) or 0
+                        local ratio = previous2 > 0 and speed2 / previous2 or 0
+                        if agreement >= 0.94 and ratio >= 0.49 and ratio <= 2.04 then
+                            m.Count = math.min((m.Count or 0) + 1, 4)
+                             
+                            m.Estimate = measured * math.sqrt(math.min(speed2, previous2) / speed2)
+                        else
+                            m.Count, m.Estimate = 1, nil
+                        end
+                        m.Measured, m.Cadence = measured, dt
+                    else
+                        m.Count, m.Estimate, m.Measured = 0, nil, nil
+                    end
+                    m.Position, m.At = position, now
+                elseif dt > 0.2 then
+                    m.Position, m.At, m.Count, m.Estimate, m.Measured = position, now, 0, nil, nil
+                end
+                local estimate = m.Estimate
+                local lifetime = math.clamp((m.Cadence or 0.025) * 2.2, 0.035, 0.12)
+                if estimate and m.Count >= 2 and now - m.At <= lifetime and now - m.RawAt >= math.min(0.12, (m.Cadence or 0.025) * 1.8) then
+                    local speed2, raw2 = estimate:Dot(estimate), velocity:Dot(velocity)
+                    local alignment = raw2 > 1 and velocity:Dot(estimate) / math.sqrt(raw2 * speed2) or 0
+                    local ratio = raw2 / speed2
+                    local sustained = m.Count >= 3 and now - m.RawAt >= 0.12
+                        and alignment >= 0.94 and (ratio < 0.49 or ratio > 2.04)
+                    if raw2 < 1 or alignment < 0.7 or ratio < 0.1225 or ratio > 7.84 or sustained then
+                        return estimate, "observed"
+                    end
+                end
+                return velocity, "native"
+            end
+            function D.Velocity(ball)
+                local character = localPlayer.Character
+                local root = character and character.PrimaryPart
+                local scan = root and D.Frame(root)
+                local _, velocity = D.Read(ball, scan)
+                return velocity or Vector3.zero
+            end
+            function D.PruneReceipts(now)
+                local receipts = D.Receipts
+                for i = #receipts, 1, -1 do
+                    local receipt = receipts[i]
+                    if receipt.Dropped or receipt.Generation ~= D.Generation or now - receipt.At > 1.5 or now < receipt.At then
+                        table.remove(receipts, i)
+                    end
+                end
+            end
+            function D.Transported(token)
+                token.TransportSucceeded = true
+            end
+            function D.Acknowledge(name, object, explicitName, now)
+                D.PruneReceipts(now)
+                local explicit = type(explicitName) == "string" and explicitName ~= ""
+                local id = explicit and explicitName or type(name) == "string" and name or nil
+                local named, count, seen = nil, 0, {}
+                local balls = features.Ball.GetAllBalls()
+                for _, ball in ipairs(balls) do
+                    if ball.Name == id and not seen[ball] then named, count = ball, count + 1; seen[ball] = true end
+                end
+                local namedReceipt = false
+                for _, receipt in ipairs(D.Receipts) do
+                    if receipt.Ball.Name == id then namedReceipt = true; break end
+                end
+                local filter = explicit or count > 0 or namedReceipt
+                local pending, owner, anyOwner, ambiguous, acknowledgedAt = nil, nil, nil, false, nil
+                for _, receipt in ipairs(D.Receipts) do
+                    if not filter or receipt.Ball.Name == id then
+                        if anyOwner and anyOwner ~= receipt.Ball then ambiguous = true end
+                        anyOwner = anyOwner or receipt.Ball
+                        if receipt.Acked then acknowledgedAt = math.max(acknowledgedAt or -math.huge, receipt.AckAt or -math.huge)
+                        else
+                            if owner and owner ~= receipt.Ball then ambiguous = true end
+                            owner, pending = owner or receipt.Ball, pending or receipt
+                        end
+                    end
+                end
+                if ambiguous then D.LastAckReason = "ambiguous"; return true end
+                if not pending then
+                    if acknowledgedAt and now - acknowledgedAt <= 0.035 then D.LastAckReason = "duplicate"; return true end
+                    if count == 1 then D.LastAckReason = "named legacy/manual"; return true, named end
+                    if filter then D.LastAckReason = "unknown or non-unique name"; return true end
+                    return false
+                end
+                if acknowledgedAt and now - acknowledgedAt <= 0.035 and pending.At <= acknowledgedAt then
+                    D.LastAckReason = "possible duplicate"; return true
+                end
+                pending.Acked, pending.AckAt = true, now
+                D.LastAck = {Ball = owner, At = now}
+                local state = F.Balls[owner]
+                 
+                if state == pending.State and state.AutoReservation == pending and state.AutoParryAt == pending.At
+                    and state.AutoCycleVersion == pending.Cycle and state.CurveVersion == pending.Version
+                    and owner.Parent == pending.Parent and localPlayer.Character == pending.Character
+                    and pending.Character.PrimaryPart == pending.Root then
+                    state.AutoParryAt = nil
+                    if sapphireBBState.AutoBall == owner then sapphireBBState.AutoBall = nil end
+                end
+                D.LastAckReason = "matched automatic receipt"
+                if u1070.config.auto_parry == true and #balls > 1 then F.QueueAuto() end
+                return true
+            end
+            function D.Choose(scan, ball, geometry, state, target, version, cycle, sender)
+                scan.Ball, scan.Geometry, scan.State, scan.Target = ball, geometry, state, target
+                scan.Version, scan.Cycle, scan.Sender = version, cycle, sender
+            end
+            function D.Selection(scan, ball, geometry, state, target, version, cycle, sender)
+                 
+                local selected = table.clone(scan)
+                D.Choose(selected, ball, geometry, state, target, version, cycle, sender)
+                return selected
+            end
+            function D.Fresh(scan)
+                local ball, state = scan.Ball, scan.State
+                local function contextCurrent()
+                    local now = os.clock()
+                    local character = localPlayer.Character
+                    return scan.Generation == D.Generation and now >= scan.At and now - scan.At <= 0.1
+                        and character == scan.Character and character ~= nil and character.PrimaryPart == scan.Root
+                        and D.SameVector(scan.Root.Position, scan.RootPosition)
+                        and D.SameVector(D.PlayerVelocity(scan.Root), scan.PlayerVelocity)
+                        and F.Balls[ball] == state and state.CurveVersion == scan.Version and state.AutoCycleVersion == scan.Cycle
+                        and compareFunction(ball) == scan.Target and D.SenderMatches(scan.Sender, ball:GetAttribute("from"), false)
+                end
+                if not contextCurrent() then return false end
+                local function sameSample(item)
+                    local sample = scan.Samples[item]
+                    if not sample or item.Parent ~= sample.Parent or not item.Parent then return false end
+                    local position, velocity, part = D.ReadRaw(item)
+                    return part == sample.Part and item.Parent == sample.Parent
+                        and D.SameVector(position, sample.Position) and D.SameVector(velocity, sample.RawVelocity)
+                end
+                 
+                return sameSample(ball) and (scan.Geometry == ball or sameSample(scan.Geometry)) and contextCurrent()
+            end
+            function D.Alive(character)
+                local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+                return humanoid and type(humanoid.Health) == "number" and humanoid.Health > 0
+                    and character.PrimaryPart and D.Vector(character.PrimaryPart.Position)
+            end
+            function D.Threat(root, position, velocity, scan)
+                local rootPosition = scan and scan.Root == root and scan.RootPosition or root.Position
+                if not D.Vector(rootPosition) or not D.Vector(position) or not D.Vector(velocity) then return false, math.huge, math.huge end
+                local playerVelocity = scan and scan.Root == root and scan.PlayerVelocity or D.PlayerVelocity(root)
+                local relative, motion = position - rootPosition, velocity - playerVelocity
+                local distanceSquared = relative:Dot(relative)
+                if distanceSquared < 0.000001 then return true, 0, 0 end
+                local distance = math.sqrt(distanceSquared)
+                if motion:Dot(motion) < 0.000001 then return true, math.huge, distance end
+                local closing = -relative:Dot(motion)
+                if closing <= 0 then return distanceSquared <= 144, math.huge, distance end
+                 
+                return true, distanceSquared / closing, distance
+            end
+            function D.Arrival(root, position, velocity, scan)
+                local approaching, radial, distance = D.Threat(root, position, velocity, scan)
+                if not approaching or radial == math.huge or distance <= 12 then return approaching, radial, distance end
+                local rootPosition = scan and scan.Root == root and scan.RootPosition or root.Position
+                local playerVelocity = scan and scan.Root == root and scan.PlayerVelocity or D.PlayerVelocity(root)
+                local relative, motion = position - rootPosition, velocity - playerVelocity
+                local a, b = motion:Dot(motion), relative:Dot(motion)
+                local missSquared = a > 0.000001 and math.max(0, relative:Dot(relative) - b * b / a) or 0
+                local penalty = math.clamp((missSquared - 144) / 144, 0, 1) * 0.5
+                return true, radial * (1 + penalty), distance
+            end
+            function D.TimingRadius(root, position, velocity, radius, scan, ping, step)
+                if type(radius) ~= "number" or radius ~= radius or radius <= 0 then return 0 end
+                if not D.Vector(position) or not D.Vector(velocity) then return radius end
+                local rootPosition = scan and scan.Root == root and scan.RootPosition or root.Position
+                if not D.Vector(rootPosition) then return radius end
+                local delta = position - rootPosition
+                local distance = delta.Magnitude
+                if distance < 0.001 then return radius end
+                local playerVelocity = scan and scan.Root == root and scan.PlayerVelocity or D.PlayerVelocity(root)
+                local closing = playerVelocity:Dot(delta) / distance
+                local latency = type(ping) == "number" and ping == ping and math.clamp(ping / 2000, 0, 0.12) or 0
+                local credit = type(step) == "number" and step == step and math.clamp(step, 0, 0.06) or 0
+                local horizon = math.clamp(latency + credit, 0.01, 0.16)
+                local adjustment = math.clamp(closing * horizon, -math.min(8, radius * 0.15), math.min(10, radius * 0.2))
+                return math.max(3, radius + adjustment)
+            end
+            function D.Clear(state)
+                state.AutoCycleVersion = (state.AutoCycleVersion or 0) + 1
+                state.AutoReservation, state.Motion = nil, nil
+                state.BackwardsScore, state.BackwardsAt = nil, nil
+            end
+            function D.Reset()
+                D.Generation += 1
+                D.Inflight, D.LastAck = nil, nil
+                table.clear(D.Receipts)
+                F.AutoJob, F.AutoBusy, F.AutoPending = nil, false, false
+                for _, state in pairs(F.Balls) do D.Clear(state) end
+            end
+            function D.Begin(ball, state, character, now, job)
+                local token = {Ball = ball, State = state, Character = character, Root = character.PrimaryPart,
+                    Target = compareFunction(ball), From = ball:GetAttribute("from"), Parent = ball.Parent,
+                    Version = state.CurveVersion, Cycle = state.AutoCycleVersion, Generation = job and job.Generation or D.Generation, Job = job, At = now, Until = now + 0.6}
+                D.PruneReceipts(now)
+                if #D.Receipts >= 16 then table.remove(D.Receipts, 1) end
+                D.Receipts[#D.Receipts + 1] = token
+                state.AutoReservation = token
+                D.Inflight = token
+                if job then job.Inflight = token end
+                return token
+            end
+            function D.Valid(token)
+                return not F.Destroyed and token.Generation == D.Generation
+                    and (not token.Job or F.AutoJob == token.Job)
+                    and token.State.AutoReservation == token and F.Balls[token.Ball] == token.State
+                    and token.State.CurveVersion == token.Version and token.Ball.Parent == token.Parent
+                    and token.Ball.Parent ~= nil and localPlayer.Character == token.Character
+                    and token.Character.PrimaryPart == token.Root and D.Alive(token.Character)
+                    and undoFunction(token.Character) and not continuation(token.Character)
+                    and (u1070.config.auto_parry == true or flags.DribbleDetection)
+                    and compareFunction(token.Ball) == token.Target
+                    and D.SenderMatches(token.From, token.Ball:GetAttribute("from"), true)
+            end
+            function D.Animate(isTriggerbot)
+                local ok, played = pcall(features.Animation.PlayAnimation, true, isTriggerbot)
+                if not ok then D.AnimationError = tostring(played); return false end
+                return played
+            end
+            function D.Finish(token)
+                if D.Inflight == token then D.Inflight = nil end
+                if token.Job and token.Job.Inflight == token then token.Job.Inflight = nil end
+            end
+            function D.Abort(token)
+                D.Finish(token)
+                if not token.TransportSucceeded and not token.Acked then token.Dropped = true end
+                local state = token.State
+                if state.AutoReservation ~= token then return end
+                state.AutoReservation = nil
+                if state.AutoParryAt ~= token.At or state.ParryResetAt ~= token.Until then return end
+                state.Parried, state.ParryResetAt, state.AutoParryAt = false, 0, nil
+                if sapphireBBState.AutoBall == token.Ball then sapphireBBState.AutoBall = nil end
+                if currentDate == token.Ball and elapsedTime == token.Until then top, currentDate, elapsedTime = false, nil, 0 end
+            end
+        end
+        initializeAutoDecision()
+    end
+    local bottomSnapZone, knob
+    local function refreshHotbar()
+        local ability, hotbar = refresh()
+        local block = hotbar and hotbar:FindFirstChild("Block")
+        bottomSnapZone = block and block:FindFirstChildOfClass("UIGradient")
+        knob = ability and ability:FindFirstChildOfClass("UIGradient")
+    end
+    function F.SyncAutoSettings()
+        refreshHotbar()
+        local config = u1070.config
+        flags.AutoParryEnabled = config.auto_parry == true
+        config.parry_mode = u864.normalize_parry_method(config.parry_mode)
+        flags.AutoParryType = config.parry_mode
+        flags.ParryAccuracy = config.accuracy or 80
+        flags.ParryRange = config.parry_range or 0
+        flags.RandomizedParryAccuracy = config.randomize_accuracy == true
+        local low = math.clamp(tonumber(config.random_accuracy_min) or 1, 1, 100)
+        local high = math.clamp(tonumber(config.random_accuracy_max) or 100, 1, 100)
+        flags.RandomAccuracyMin, flags.RandomAccuracyMax = math.min(low, high), math.max(low, high)
+        flags.AutoAbilityEnabled = u1070.ability.auto_ability == true
+        flags.CooldownProtectionEnabled = u1070.ability.cooldown_protection == true
+        flags.AutoSpamEnabled = u1070.spam.auto_enabled == true
+        flags.TriggerbotEnabled = u1070.triggerbot.enabled == true
+        flags.AntiCurveEnabled, flags.BackwardsAntiCurveEnabled = true, true
+    end
+    local autoAbilities = {
+        "Calming Deflection", "Raging Deflection", "Rapture", "Aerodynamic Slash", "Forcefield",
+        "Infinity", "Fracture", "Phantom", "Ninja Dash", "Dribble", "Dragon Spirit"
+    }
+    local function wrapper(abilities)
+        if not abilities or not abilityReady() then return false end
+        for _, name in ipairs(autoAbilities) do
+            local ability = abilities:FindFirstChild(name)
+            if ability and ability.Enabled then return fireAbility() end
+        end
+        return false
+    end
+    local left = {Fire = function() return fireAbility() end}
+    features.Loop = {InvisDetection = F.InvisDetection}
+    features.Ball.GetAllBalls = function(refreshed)
+        if not refreshed then refresh() end
+        local char = localPlayer.Character
+        local training = char and char.Parent ~= smallest and isInTrainingArea(char)
+        local folder = training and CoreGui or playerGui
+        local list = {}
+        for _, item in ipairs(u1070.ball.get_all()) do
+            local ball = item.model or item.part
+            if folder and ball.Parent == folder then table.insert(list, ball) end
+        end
+        return list
+    end
+    features.Ball.GetMainBall = function()
+        local char = localPlayer.Character
+        local root = char and char.PrimaryPart
+        local best, time, distance
+        local scan = root and u1070.config.auto_parry == true and F.Decision.Frame(root)
+        for _, ball in ipairs(features.Ball.GetAllBalls()) do
+            if compareFunction(ball) == localPlayer.Name then
+                if not root then features.Ball.Target = ball; return ball end
+                local arrival, separation
+                if u1070.config.auto_parry == true then
+                    local position, velocity = F.Decision.Read(ball, scan)
+                    if not position then continue end
+                    local approaching
+                    approaching, arrival, separation = F.Decision.Threat(root, position, velocity, scan)
+                    if not approaching then continue end
+                else
+                    arrival, separation = onInputEnded(ball, root.Position)
+                end
+                if not best or arrival < time or arrival == time and separation < distance then
+                    best, time, distance = ball, arrival, separation
+                end
+            end
+        end
+        features.Ball.Target = best
+        return best
+    end
+    F.MainBall = features.Ball.GetMainBall
+    features.Parry = {Fire = function()
+         
+        return F.Fire("Remote"), false
+    end}
+    features.Curve = {GetCFrame = function() return u1070.curve.get_cframe() end}
+     
+    local A = {Generation = 0, Owned = {}, Metadata = {}, Pending = nil}
+    F.AutoAnimation = A
+    local function oxyTrack()
+        local oxy = u1070.oxy_manual
+        return oxy and oxy.Visual and oxy.Visual.Track
+    end
+    function A.Reset(full)
+        A.Generation += 1
+        A.Pending = nil
+        for track in pairs(A.Owned) do
+            if track ~= oxyTrack() then pcall(function() track:Stop(0) end) end
+        end
+        table.clear(A.Owned)
+        sapphireBBState.GrabAnimation = nil
+        sapphireBBState.AutoParryAnimationPlayed = nil
+        if full then A.Sword = nil end
+    end
+    function A.Allowed(character, sword, generation)
+        if F.Destroyed or u1070.config.auto_parry_animation_fix ~= true or u1070.config.auto_parry ~= true
+            or character ~= localPlayer.Character or A.Generation ~= generation then return false end
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        return humanoid and humanoid.Health > 0 and undoFunction(character) and not continuation(character)
+            and (u1070.animation.get_sword_name() or "Base Sword") == sword
+    end
+    function A.Modules()
+        local shared = replicatedStorage:FindFirstChild("Shared")
+        local controllers = replicatedStorage:FindFirstChild("Controllers")
+        local apiModule = shared and shared:FindFirstChild("SwordAPI")
+        local controllerModule = controllers and controllers:FindFirstChild("AnimationController")
+        if not apiModule or not controllerModule then error("SwordAPI/AnimationController is missing", 0) end
+        if A.APIModule ~= apiModule then A.API = require(apiModule); A.APIModule = apiModule end
+        if A.ControllerModule ~= controllerModule then A.Controller = require(controllerModule); A.ControllerModule = controllerModule end
+        return shared, A.API, A.Controller
+    end
+    function A.ParryAnimation(character, sword, generation)
+        if not A.Allowed(character, sword, generation) then return false end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+        if not animator then return false end
+        local shared, api, controller = A.Modules()
+        if not A.Allowed(character, sword, generation) then return false end
+        local data = A.Metadata[sword]
+        if not data then
+            local replicated = shared:FindFirstChild("ReplicatedInstances")
+            local swords = replicated and replicated:FindFirstChild("Swords")
+            local getSword = swords and swords:FindFirstChild("GetSword")
+            if not getSword then error("Sword metadata is missing", 0) end
+            data = getSword:Invoke(sword)
+            if type(data) ~= "table" then error("Sword metadata could not be resolved", 0) end
+            A.Metadata[sword] = data
+        end
+         
+        local assets = api:GetAnimations(character, {"Parry", "GrabParry"}, data.AnimationType, data.SwordType)
+        if not A.Allowed(character, sword, generation) then return false end
+        if type(assets) ~= "table" or not next(assets) then return false end
+        local tracks = {}
+        for _, asset in pairs(assets) do
+            if not A.Allowed(character, sword, generation) then return false end
+            local track = controller:LoadAnimation(animator, asset, true)
+            if track then table.insert(tracks, track) end
+        end
+        if not A.Allowed(character, sword, generation) then return false end
+        for _, track in pairs(controller:GetPlayingAnimationTracks(animator)) do
+            if track ~= oxyTrack() and (track:GetAttribute("GrabParry") or track:GetAttribute("Parry")
+                or track.Name == "GrabParry" or track.Name == "Grab" or track.Name == "SuccessParry" or track.Name == "Success") then
+                track:Stop(track:GetAttribute("StopFadeTime") or 0.1)
+            end
+        end
+        table.clear(A.Owned)
+        sapphireBBState.GrabAnimation = {}
+        local played = false
+        for _, track in ipairs(tracks) do
+            if not A.Allowed(character, sword, generation) then return false end
+            A.Owned[track] = true
+            local speed = track:GetAttribute("PlaySpeed") or 1
+            track:Play(track:GetAttribute("PlayFadeTime") or 0.001, track:GetAttribute("PlayWeight") or 1, speed)
+            character:SetAttribute("ParryTime", math.max(character:GetAttribute("ParryTime") or 0,
+                track.Length == 0 and 1 or (track.Length - track.TimePosition) * speed))
+            table.insert(sapphireBBState.GrabAnimation, track)
+            played = true
+        end
+        return played
+    end
+    function A.Queue()
+        if F.Destroyed or u1070.config.auto_parry_animation_fix ~= true or u1070.config.auto_parry ~= true then return false end
+        local character = localPlayer.Character
+        local sword = u1070.animation.get_sword_name() or "Base Sword"
+        local generation = A.Generation
+        if not A.Allowed(character, sword, generation) then return false end
+        if A.Pending then return true end
+        A.Sword = sword
+        local pending = {}
+        A.Pending = pending
+         
+        task.defer(function()
+            if not A.Allowed(character, sword, generation) then
+                if A.Pending == pending then A.Pending = nil end
+                return
+            end
+            local ok, played = pcall(A.ParryAnimation, character, sword, generation)
+            if A.Pending == pending then A.Pending = nil end
+            if A.Generation ~= generation then return end
+            if not ok or not played then
+                sapphireBBState.AutoParryAnimationPlayed = nil
+                local message = ok and "No parry animation could be played" or tostring(played)
+                if A.LastError ~= message then warn("[Allusive Private] Auto Parry Animation Fix: " .. message) end
+                A.LastError = message
+            else A.LastError = nil end
+        end)
+        return true
+    end
+    function A.WatchCharacter()
+        F.Disconnect("AP Animation Character Sword")
+        local character = localPlayer.Character
+        if character then
+            connect("AP Animation Character Sword", character:GetAttributeChangedSignal("CurrentlyEquippedSword"), function()
+                if A.Sword ~= (u1070.animation.get_sword_name() or "Base Sword") then A.Reset(true) end
+            end)
+        end
+    end
+    function F.SetAutoAnimation(enabled)
+        if F.Destroyed then return end
+        u1070.config.auto_parry_animation_fix = enabled == true
+        A.Reset(false)
+    end
+    connect("AP Animation Player Sword", localPlayer:GetAttributeChangedSignal("CurrentlyEquippedSword"), function()
+        if A.Sword ~= (u1070.animation.get_sword_name() or "Base Sword") then A.Reset(true) end
+    end)
+    A.WatchCharacter()
+    features.Animation = {
+        Keypress = function() return F.Fire("Keypress") end,
+        Input = function(method) return F.Fire(method) end,
+        PlayAnimation = function(_, isTriggerbot)
+            if isTriggerbot then
+                 
+                if u1070.animation and u1070.animation.play_grab then task.spawn(u1070.animation.play_grab) end
+                return true
+            end
+            return A.Queue()
+        end
+    }
+    sapphireBBState.SpamParries = {}
+    features.Player = {GetClosest = function()
+        local char = localPlayer.Character
+        local root = char and char.PrimaryPart
+        if not root or not smallest then return nil end
+        local best, distance = nil, math.huge
+        for _, other in ipairs(smallest:GetChildren()) do
+            local part = other:IsA("Model") and (other.PrimaryPart or other:FindFirstChild("HumanoidRootPart"))
+            if other ~= char and part then
+                local separation = (part.Position - root.Position).Magnitude
+                if separation < distance then best, distance = other, separation end
+            end
+        end
+        return best
+    end}
+
+features.Detection.UseProtection = function(line, object)
+	local osClock = os.clock()
+
+	if not (sapphireBBState.ParryCooldownUntil and osClock < sapphireBBState.ParryCooldownUntil or bottomSnapZone and bottomSnapZone.Offset.Y < 0.49) then
+		sapphireBBState.ParryCooldownUntil = nil
+		sapphireBBState.PreclickFired = nil
+		sapphireBBState.PreclickCooldown = nil
+		sapphireBBState.CooldownProtected = nil
+	elseif flags.CooldownProtectionEnabled then
+		if sapphireBBState.CooldownProtected then
+			return true
+		end
+
+		if osClock < (sapphireBBState.ParryActiveUntil or 0) then
+			return true
+		end
+		local result8 = features.Ball and features.Ball.GetMainBall and features.Ball.GetMainBall()
+		local exponent = (result8 and (u1070.config.auto_parry == true and F.Decision.Velocity(result8) or index4(result8)) or Vector3.zero).Magnitude
+		local cell = not result8 or exponent < 35
+		local active
+
+		if cell then
+			active = cell
+		else
+			local targetPlayerName = localPlayer.Name
+			active = compareFunction(result8) ~= targetPlayerName
+		end
+
+		if active then
+			return true
+		end
+
+		if sapphireBBState.PreclickCooldown then
+			local difference = (previous() + math.min(pingJitterMs(), 30)) / 1000
+			if math.max(0, (line.PrimaryPart.Position - unexecuteFunction(result8)).Magnitude - 5) / exponent - difference > math.max(0, 0.5 - difference) then
+				return true
+			end
+		end
+
+		if knob and knob.Offset.Y >= 0.49 then
+			sapphireBBState.CooldownProtected = true
+			left:Fire()
+			return true, true
+		end
+
+		return true
+	end
+
+	if object then
+		return false
+	end
+
+	if flags.AutoAbilityEnabled then
+		line = line and line:FindFirstChild("Abilities")
+
+		if features.Ball and features.Ball.GetMainBall then
+			features.Ball.GetMainBall()
+		end
+
+		if wrapper(line) then
+			return true, true
+		end
+	end
+
+	return false
+end
+
+attemptAutoParry = function(player15, line, object, descendant, radius, zCoordinate, isTriggerbot, decision)
+    if decision and not F.Decision.Valid(decision) then return false end
+	local model = localPlayer.Character
+	if not undoFunction(model) then
+		return false
+	end
+
+	if continuation(model) then
+		return false
+	end
+
+	if not player15 then
+		player15 = features.Ball and features.Ball.GetMainBall and features.Ball.GetMainBall()
+	end
+
+	if not player15 then
+		return false
+	end
+	line = line or flags.AutoParryType
+
+	if line == "Remote" then
+		if features.Parry and features.Parry.Fire then
+			sapphireBBState.ParryMethod = "Remote"
+			local cell = not descendant
+
+			if cell then
+				local targetPlayerName = localPlayer.Name
+				cell = compareFunction(player15) ~= targetPlayerName
+			end
+
+			if cell then
+				return false
+			end
+
+			if index6(player15) then
+				sapphireBBState.ParryMethod = "Keypress"
+				if not features.Animation.Keypress() then
+					return false
+				end
+                if decision then F.Decision.Transported(decision) end
+			else
+				local osClock = os.clock()
+
+				if sapphireBBState.ParryCooldownUntil and osClock >= sapphireBBState.ParryCooldownUntil then
+					sapphireBBState.AutoParryAnimationPlayed = nil
+				end
+
+				local active = not sapphireBBState.AutoParryAnimationPlayed and (not sapphireBBState.ParryCooldownUntil or osClock >= sapphireBBState.ParryCooldownUntil)
+				local radians, angleRadians = features.Parry.Fire(object and features.Curve.GetCFrame() or nil)
+                if decision and radians then F.Decision.Transported(decision) end
+                if decision and not F.Decision.Valid(decision) then return false end
+				if not radians then
+					return false
+				end
+
+				if active and sapphireBBState.ParryMethod == "Remote" then
+					if angleRadians or (decision and F.Decision.Animate(isTriggerbot) or not decision and features.Animation.PlayAnimation(true, isTriggerbot)) then
+						sapphireBBState.AutoParryAnimationPlayed = true
+					end
+				end
+			end
+		end
+	else
+		local cell = not descendant
+
+		if cell then
+			local targetPlayerName = localPlayer.Name
+			cell = compareFunction(player15) ~= targetPlayerName
+		end
+
+		if cell then
+			return false
+		end
+		if not features.Animation.Input(line) then
+			return false
+		end
+        if decision then F.Decision.Transported(decision) end
+        if decision and not F.Decision.Valid(decision) then return false end
+        if not isTriggerbot then
+            if decision then F.Decision.Animate() else features.Animation.PlayAnimation(true) end
+        end
+	end
+
+    if decision and not F.Decision.Valid(decision) then return false end
+	if flags.AutoSpamEnabled then
+		local osClock = os.clock()
+
+		while sapphireBBState.SpamParries[1] and sapphireBBState.SpamParries[1] < osClock - 0.75 do
+			table.remove(sapphireBBState.SpamParries, 1)
+		end
+
+		sapphireBBState.SpamParries[#sapphireBBState.SpamParries + 1] = osClock
+		local cell = not descendant
+
+		if cell then
+			local targetPlayerName = localPlayer.Name
+			cell = compareFunction(player15) == targetPlayerName
+		end
+
+		if cell then
+			sapphireBBState.SpamBall = player15
+			sapphireBBState.SpamTargetAt = osClock
+		end
+	end
+
+	sapphireBBState.PreclickFired = nil
+	sapphireBBState.PreclickCooldown = nil
+	sapphireBBState.ParryActiveUntil = os.clock() + math.max(0, 0.5 - (radius or previous() + math.min(pingJitterMs(), 40)) / 2000)
+	sapphireBBState.CooldownProtected = nil
+	return true
+end
+
+ 
+features.Loop.MainParryLoop = function(line, job)
+    if F.Destroyed or (job and (job.Generation ~= F.Decision.Generation or F.AutoJob ~= job)) then return end
+    F.SyncAutoSettings()
+	local graph = flags.AutoParryEnabled
+	if not graph and not flags.DribbleDetection then
+		return
+	end
+	local osClock = os.clock()
+	smallest = smallest and smallest.Parent and smallest or workspace:FindFirstChild("Alive")
+	local model = localPlayer.Character
+	if not undoFunction(model) or not F.Decision.Alive(model) then
+		return
+	end
+
+	if continuation(model) then
+		return
+	end
+	local vehicleRoot = model.PrimaryPart
+	local radians = features.Ball.GetAllBalls(true)
+	if #radians == 0 then
+		return
+	end
+
+	if features.Detection.UseProtection(model, true) then
+		return
+	end
+    if job and (job.Generation ~= F.Decision.Generation or F.AutoJob ~= job) then return end
+	local valueType = flags.AutoParryType
+	local cell = valueType == "Remote"
+
+	if cell then
+		cell = osClock < (sapphireBBState.ExtraParryCooldownUntil or 0)
+	end
+
+	if cell then
+		return
+	end
+	sapphireBBState.ExtraParryCooldownUntil = nil
+
+	if top and osClock >= elapsedTime then
+		top = false
+		currentDate = nil
+	end
+
+    local provider = u1070.cache.adaptive_ping
+    local networkSnapshot = provider and provider.Snapshot and provider.Snapshot()
+    local angleRadians = networkSnapshot and networkSnapshot.CompensationPing or previous()
+    local jitter = math.min(networkSnapshot and networkSnapshot.Jitter or pingJitterMs(), 40)
+	local difference = (angleRadians + math.min(osClock - (sapphireBBState.ParryFrameAt or osClock), 0.02) * 1000) / 1000
+	sapphireBBState.ParryFrameAt = osClock
+	local openError = math.clamp(angleRadians / 10 + jitter / 8, 10, 16.7 + jitter / 8)
+	local step = math.clamp(difference * 0.5 - 0.05 + jitter / 2000, 0, 0.04 + jitter / 2000)
+	local clampedY = math.clamp(tonumber(flags.ParryRange) or 0, 0, 10)
+
+	if flags.RandomizedParryRange then
+		clampedY = math.random(flags.RandomizedRangeMin or 0, flags.RandomizedRangeMax or 10)
+	end
+	local currentPosition = vehicleRoot.Position
+	local targetPlayerName = localPlayer.Name
+	local track, vertexCount = features.Detection.BlocksParry(nil, model, vehicleRoot)
+	if track then
+		return
+	end
+	local active = #radians > 1
+	local label = active and sapphireBBState.AutoBall
+	local steering = nil
+
+	if label then
+		local attachment = sapphireBBState.AutoBall
+		local major = managerObject[attachment]
+		local isArray = graph and attachment.Parent and attachment:GetAttribute("from") == targetPlayerName
+		steering = nil
+
+		if isArray then
+			steering = features.Loop.InvisDetection(model)
+		end
+
+		local bestLabel = not steering and attachment.Parent and compareFunction(attachment) == targetPlayerName
+
+		if bestLabel then
+			bestLabel = osClock < (major and major.ParryResetAt or 0)
+		end
+
+        if bestLabel and osClock < (sapphireBBState.ParryActiveUntil or (major and major.ParryResetAt) or 0) then
+            return
+        end
+         
+		sapphireBBState.AutoBall = nil
+	end
+
+    local scan = active and F.Decision.Frame(vehicleRoot, networkSnapshot) or nil
+    if active and not scan then return end
+    if scan then currentPosition = scan.RootPosition end
+	local mathMax = 0
+
+	if active then
+		for _, weld in pairs(radians) do
+            local position, velocity = F.Decision.Read(weld, scan)
+            if not position then continue end
+			local byte = managerObject[weld]
+			local result68 = weld and compareFunction(weld)
+			local splitHorizontal = byte and byte.Parried
+
+			if splitHorizontal then
+				splitHorizontal = osClock < (byte.ParryResetAt or 0)
+			end
+
+			if splitHorizontal then
+				mathMax += 1
+			elseif result68 == targetPlayerName and not index17(weld, result68) then
+				local minX = math.huge
+
+                local approaching, arrival = F.Decision.Arrival(vehicleRoot, position, velocity, scan)
+				if approaching and arrival < minX then
+					mathMax += 1
+				end
+			end
+
+			if not (1 < mathMax) then
+				continue
+			end
+			break
+		end
+	end
+
+	local isArray = mathMax > 1
+	local major = nil
+	local byte = nil
+	local result68 = nil
+    local abilitySelection = nil
+	local net = nil
+	local slider = nil
+	local newPrice = nil
+	local screenPoint = nil
+	local bestLabel = nil
+	local result69 = nil
+	local result70 = nil
+	local result71 = nil
+
+	for _, word in pairs(radians) do
+		if word and word.Parent then
+             
+            if flags.DribbleDetection and not F.Decision.Read(word, scan) then continue end
+			local ikConstraint = index7(word)
+			local result72 = compareFunction(word)
+
+			if not index17(word, result72) then
+				local result73 = nil
+				local bestPair = nil
+
+				if flags.DribbleDetection then
+					result73, bestPair = features.Detection.GetSelfDribbleBall(word, vehicleRoot)
+				end
+
+				local isPinned = not result73 and graph and word:GetAttribute("from") == targetPlayerName
+				local changed = false
+
+				if isPinned then
+					if steering ~= nil then
+						changed = steering
+					else
+						changed = features.Loop.InvisDetection(model)
+						steering = changed
+					end
+				end
+
+				if changed then
+					if ikConstraint.InvisibleReturnAway == nil then
+						ikConstraint.InvisibleReturnAway = not ikConstraint.Parried
+					end
+
+					local dotProduct = (currentPosition - unexecuteFunction(word)):Dot(index4(word))
+					bestPair = dotProduct > 0
+
+					if dotProduct < 0 then
+						ikConstraint.InvisibleReturnAway = true
+					end
+
+					local result14 = ikConstraint.InvisibleReturnAway
+
+					if result14 then
+						result73 = word
+					else
+						result73 = word
+						bestPair = result14
+					end
+				else
+					ikConstraint.InvisibleReturnAway = nil
+				end
+
+				if not (not graph and not result73) then
+					if result73 and (changed and ikConstraint.InvisibleReturnAway or not changed and sapphireBBState.SelfDribbleAway) then
+						ikConstraint.Parried = false
+						ikConstraint.ParryResetAt = 0
+
+						if sapphireBBState.ManualBall == word then
+							sapphireBBState.ManualBall = nil
+						end
+
+						if currentDate == word then
+							top = false
+							currentDate = nil
+							elapsedTime = 0
+						end
+					end
+
+					if sapphireBBState.AutoBall == word and result72 ~= targetPlayerName then
+						sapphireBBState.AutoBall = nil
+					end
+
+					if sapphireBBState.ManualBall == word then
+						if result72 == targetPlayerName then
+							continue
+						end
+						sapphireBBState.ManualBall = nil
+					end
+
+					if ikConstraint.LoopTarget ~= result72 then
+                        F.Decision.Clear(ikConstraint)
+                        F.Predictive.Clear(ikConstraint)
+                        if currentDate == word then top, currentDate, elapsedTime = false, nil, 0 end
+						ikConstraint.Parried = false
+						ikConstraint.ParryResetAt = 0
+
+						if ikConstraint.Target ~= result72 then
+							if result72 == targetPlayerName then
+								index13(ikConstraint)
+							else
+								index14(ikConstraint)
+							end
+						end
+
+						ikConstraint.LoopTarget = result72
+
+						if result72 == targetPlayerName and currentDate == word then
+							top = false
+							currentDate = nil
+							elapsedTime = 0
+						end
+					end
+
+					if result72 ~= targetPlayerName then
+						ikConstraint.Parried = false
+					elseif ikConstraint.Parried then
+						if osClock < (ikConstraint.ParryResetAt or 0) then
+							continue
+						end
+						ikConstraint.Parried = false
+					end
+
+					local bestChild = packed == word and word or nil
+
+					if packed and features.Detection.GetDribbleBall(packed) ~= packed then
+						if currentDate == packed then
+							top = false
+							currentDate = nil
+							elapsedTime = 0
+						end
+
+						packed = nil
+						bestChild = nil
+					end
+
+					if flags.ParryOnDribble and not packed then
+						bestChild = features.Detection.GetDribbleBall(word)
+
+						if bestChild then
+							packed = bestChild
+						end
+					end
+
+					if not (word:GetAttribute("DribbleActive") == true and not flags.ParryOnDribble and not result73 and result72 ~= targetPlayerName) then
+						local dotProduct = bestChild or result73 or word
+                        if not scan then
+                            scan = F.Decision.Frame(vehicleRoot, networkSnapshot)
+                            if not scan then return end
+                            currentPosition = scan.RootPosition
+                        end
+                        local choiceVersion, choiceCycle, choiceFrom = ikConstraint.CurveVersion, ikConstraint.AutoCycleVersion, word:GetAttribute("from")
+                        if dotProduct ~= word and not F.Decision.Read(word, scan) then continue end
+                        local ballPosition, moveDirection, result74 = F.Decision.Read(dotProduct, scan)
+                        if not result74 then continue end
+						local exponent = moveDirection.Magnitude
+						local index3 = dotProduct == word and result72 or compareFunction(dotProduct)
+						local rayOrigin = redoFunction(dotProduct, result74, osClock) or ballPosition
+						local leftChild = currentPosition - rayOrigin
+						local totalTime = leftChild.Magnitude
+						local endPosition = 101 - math.clamp(tonumber(flags.ParryAccuracy) or 80, 1, 100)
+						local ENT = sapphireBBState.PhantomData
+						local innerPlayer = sapphireBBState.PhantomTarget
+						innerPlayer = innerPlayer and innerPlayer:FindFirstChild("HumanoidRootPart")
+						local index31 = ENT and ENT.Name == "Phantom" and not ENT.Blatant and ENT.Type == "Spam" and innerPlayer and (currentPosition - innerPlayer.Position).Magnitude
+
+						if flags.RandomizedParryAccuracy then
+							local maximumValue = math.clamp(flags.RandomAccuracyMin or 1, 1, 100)
+							endPosition = 101 - math.random(maximumValue, math.clamp(flags.RandomAccuracyMax or 100, maximumValue, 100))
+						end
+
+						if index31 and index31 > 30 then
+							endPosition = 100
+						elseif index31 and not ENT.Released then
+							continue
+						end
+
+						local isRoblox = not result73
+
+                        local curveBlocked = isRoblox and (flags.BackwardsAntiCurveEnabled and index11(dotProduct, moveDirection, index3, active) or index15(dotProduct, vehicleRoot, rayOrigin, moveDirection, totalTime, exponent, leftChild, index3, difference))
+                        if curveBlocked and u1070.config.predictive_timing == true then F.Predictive.Clear(ikConstraint) end
+                        if not curveBlocked then
+							if not (result73 and not bestPair) then
+								local maximumValue = math.clamp((endPosition - 1) / 99, 0, 1)
+								local offsetZ = maximumValue * maximumValue * (3 - 2 * maximumValue)
+								local newDenominator = 2.4 + math.clamp(exponent - 9.5, 0, 990.5) * 0.002
+								local center = exponent / newDenominator * (0.75 + maximumValue * 0.43)
+								local isInside = center <= 9.5
+								local clampedX = isInside and math.min(openError, exponent * difference) or openError + math.min(exponent * step, 30)
+								local max = clampedX + math.max(center, 9.5)
+								local tMinimum
+
+								if not (endPosition > 70) then
+									tMinimum = max
+								else
+									local maximumLength = math.clamp((endPosition - 44) / 30, 0, 1)
+									local index35 = maximumLength * maximumLength * (3 - 2 * maximumLength)
+									local callbackFunction = word:GetAttribute("from")
+									local offsetY = type(callbackFunction) == "string" and smallest and smallest:FindFirstChild(callbackFunction)
+
+									if offsetY then
+										offsetY = offsetY.PrimaryPart or offsetY:FindFirstChild("HumanoidRootPart")
+									end
+
+									offsetY = offsetY and (currentPosition - offsetY.Position).Magnitude
+									local index36 = offsetY and math.clamp((8 - offsetY) / 3, 0, 1) or 0
+
+									if offsetY and totalTime > offsetY + 3 then
+										index36 = 0
+									end
+
+									local index37 = (isInside and math.min(openError, exponent * difference) or openError) + math.max(exponent / newDenominator * (0.75 + maximumValue * 0.2), 9.5)
+									local index38 = openError + exponent / newDenominator * (1.4 + maximumValue * 0.2)
+									local clampedDistance = math.clamp((exponent - 1000) / 800, 0, 1)
+									local index39 = index38 + math.max(index37 - index38, 0) * clampedDistance
+									tMinimum = max + (index39 + (index37 - index39) * index36 - max) * index35
+								end
+
+								local maximumLength
+
+								if isArray and endPosition > 44 then
+									maximumLength = math.max(tMinimum, max)
+								else
+									maximumLength = tMinimum
+								end
+
+								isInside = isInside and (openError - clampedX) * (1 - offsetZ) or 0
+								local index35 = bestChild and clampedX * (1 - offsetZ * 0.5) or 0
+								local index36 = maximumLength + clampedY + isInside + index35
+                                if dotProduct == word and not result73 and not bestChild and result72 == targetPlayerName and u1070.config.predictive_timing ~= true then
+                                    index36 = F.Decision.TimingRadius(vehicleRoot, rayOrigin, moveDirection, index36, scan, angleRadians, step)
+                                end
+								local seat = flags.AutoAbilityEnabled and not result73 and result72 == targetPlayerName and totalTime <= maximumLength
+								local result75 = nil
+								local index58 = nil
+
+								if seat then
+                                    local approaching
+                                    approaching, result75, index58 = F.Decision.Arrival(vehicleRoot, rayOrigin, moveDirection, scan)
+                                    if not approaching then result75 = math.huge end
+
+									if approaching and (not major or result75 < major or result75 == major and index58 < byte) then
+										major = result75
+										byte = index58
+										result68 = word
+                                        abilitySelection = F.Decision.Selection(scan, word, dotProduct, ikConstraint, result72, choiceVersion, choiceCycle, choiceFrom)
+									end
+								end
+
+								isRoblox = isRoblox and result72 ~= targetPlayerName and leftChild:Dot(moveDirection) > 0
+
+								if isRoblox then
+									if steering ~= nil then
+										isRoblox = steering
+									else
+										steering = features.Loop.InvisDetection(model)
+										isRoblox = steering
+									end
+								end
+
+                                local timingAllowed = totalTime <= index36
+                                if u1070.config.predictive_timing == true and dotProduct == word and not result73 and not bestChild and result72 == targetPlayerName then
+                                    timingAllowed = F.Predictive.Evaluate(ikConstraint, word, result72, vehicleRoot, rayOrigin, moveDirection, index36,
+                                        F.Predictive.Credit(exponent, step, endPosition, isArray, tMinimum, max, center), angleRadians, osClock)
+                                end
+                                if dotProduct == word and not result73 and not bestChild and result72 == targetPlayerName then
+                                    local approaching, arrival, centerArrival = F.Decision.Arrival(vehicleRoot, rayOrigin, moveDirection, scan)
+                                    timingAllowed = timingAllowed and approaching
+                                    if active then result75, index58 = arrival, centerArrival end
+                                end
+								if (isRoblox or not result73 and result72 == targetPlayerName or bestChild or bestPair) and timingAllowed and not ikConstraint.Parried and (not top or currentDate ~= word) then
+									local empty = isRoblox or bestPair or not result73 and result72 == targetPlayerName
+
+									if not empty and bestChild then
+										empty = features.Detection.GetDribbleBall(bestChild) == bestChild
+									end
+
+									if empty then
+										if active and not result75 then
+											result75, index58 = onInputEnded(dotProduct, currentPosition, rayOrigin, moveDirection)
+										end
+
+										if not net or result75 < slider or result75 == slider and index58 < newPrice then
+											bestLabel = not not (isRoblox or bestChild or result73)
+											net = word
+                                            F.Decision.Choose(scan, word, dotProduct, ikConstraint, result72, choiceVersion, choiceCycle, choiceFrom)
+											slider = result75
+											newPrice = index58
+											screenPoint = ikConstraint
+											result69 = endPosition
+											result70 = bestPair
+											result71 = changed
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+
+    local abilityUsed = result68 and F.Decision.Fresh(abilitySelection) and wrapper(vertexCount)
+    if job and (job.Generation ~= F.Decision.Generation or F.AutoJob ~= job) then return end
+	if abilityUsed then
+		top = true
+		currentDate = result68
+		elapsedTime = osClock + 0.6
+		return
+	end
+
+	if not net then
+		return
+	end
+    if job and (job.Generation ~= F.Decision.Generation or F.AutoJob ~= job) then return end
+    if not F.Decision.Fresh(scan) then return end
+    local decision = F.Decision.Begin(net, screenPoint, model, osClock, job)
+    if not F.Decision.Valid(decision) then F.Decision.Abort(decision); return end
+	screenPoint.Parried = true
+	screenPoint.ParryResetAt = osClock + 0.6
+	screenPoint.AutoParryAt = osClock
+	top = true
+	currentDate = net
+	elapsedTime = screenPoint.ParryResetAt
+	sapphireBBState.AutoBall = net
+
+    if not attemptAutoParry(net, valueType, nil, bestLabel, angleRadians, result69, nil, decision)
+        or not F.Decision.Valid(decision) then
+        F.Decision.Abort(decision)
+        return
+    end
+
+    F.Decision.Finish(decision)
+	if valueType == "Remote" then
+		sapphireBBState.AutoParryAt = osClock
+	end
+
+	if result70 then
+		if result71 then
+			screenPoint.InvisibleReturnAway = false
+		else
+			sapphireBBState.SelfDribbleAway = false
+		end
+	end
+end
+
+     
+    function F.ResetAutoState()
+        if F.Predictive then F.Predictive.Reset() end
+        if F.Decision then F.Decision.Reset() end
+        top, currentDate, elapsedTime, packed = false, nil, 0, nil
+        sapphireBBState.ParryFrameAt = nil
+        sapphireBBState.AutoBall, sapphireBBState.ManualBall, features.Ball.Target = nil, nil, nil
+        sapphireBBState.AutoParryAt, sapphireBBState.AutoParryAnimationPlayed = nil, nil
+        sapphireBBState.ParryCooldownUntil, sapphireBBState.ExtraParryCooldownUntil = nil, nil
+        sapphireBBState.PreclickFired, sapphireBBState.PreclickCooldown, sapphireBBState.CooldownProtected = nil, nil, nil
+        sapphireBBState.SelfDribbleBall, sapphireBBState.SelfDribbleAway = nil, nil
+        for _, state in pairs(managerObject) do
+            state.Parried, state.ParryResetAt, state.AutoParryAt = false, 0, nil
+            state.InvisibleReturnAway = nil
+            state.BackwardsScore, state.BackwardsAt = nil, nil
+            index14(state)
+        end
+    end
+    function F.StepAuto(delta)
+        if F.Destroyed then return end
+        local ping = u1070.cache.adaptive_ping
+        if ping then ping.RecordFrame(delta) end
+        if u1070.config.auto_parry ~= true and not flags.DribbleDetection then
+            flags.AutoParryEnabled = false
+            return
+        end
+        if u1070.config.predictive_timing == true then F.Predictive.Observe(delta) end
+        if F.AutoBusy then F.AutoPending = true; return end
+        local job = {Generation = F.Decision.Generation}
+        F.AutoJob, F.AutoBusy = job, true
+        local ok, err = xpcall(function() features.Loop.MainParryLoop(nil, job) end, debug.traceback)
+        if not ok and job.Inflight then F.Decision.Abort(job.Inflight) end
+        if F.AutoJob == job then
+            F.AutoJob, F.AutoBusy = nil, false
+            local retry = F.AutoPending
+            F.AutoPending = false
+            if retry and not F.Destroyed and (u1070.config.auto_parry or flags.DribbleDetection) then F.QueueAuto() end
+        end
+        if not ok and os.clock() - (F.AutoErrorAt or -math.huge) > 5 then
+            F.AutoErrorAt = os.clock()
+            warn("[Allusive Private] Auto Parry: " .. tostring(err))
+        end
+    end
+    F.RunAutoParry = features.Loop.MainParryLoop
+    function F.QueueAuto()
+        if F.Destroyed or F.AutoQueued then return end
+        F.AutoQueued = true
+        task.defer(function()
+            F.AutoQueued = false
+            if not F.Destroyed then F.StepAuto() end
+        end)
+    end
+    function F.SetAutoEnabled(enabled)
+        if F.Destroyed or F.SyncingModeUI then return end
+        enabled = enabled == true
+        u1070.config.auto_parry = enabled
+        if not enabled then A.Reset(false) end
+        local restoreTrigger = false
+        if enabled and u1070.triggerbot.enabled then
+            sapphireBBState.AutoParryTriggerbot = true
+            sapphireBBState.TriggerbotAutoParry = nil
+            if F.SetTriggerEnabled then F.SetTriggerEnabled(false) end
+        elseif not enabled and sapphireBBState.AutoParryTriggerbot then
+            sapphireBBState.AutoParryTriggerbot = nil
+            restoreTrigger = true
+        end
+        F.ResetAutoState()
+        F.SyncAutoSettings()
+        if F.RefreshModeCard then F.RefreshModeCard("Auto Parry", enabled) end
+        if restoreTrigger and F.SetTriggerEnabled then F.SetTriggerEnabled(true)
+        elseif enabled then F.QueueAuto() end
+    end
+    function F.SetAutoLoop(mode)
+         
+        u1070.config.parry_loop = "PreSimulation"
+        connect("Auto Parry", runService.PreSimulation, F.StepAuto)
+    end
+    function F.OnAutoTargetChanged(ball, state, target, old)
+        F.Decision.Clear(state)
+        F.Predictive.Clear(state)
+        state.Parried, state.ParryResetAt = false, 0
+        if sapphireBBState.ManualBall == ball then sapphireBBState.ManualBall = nil end
+        if currentDate == ball then top, currentDate, elapsedTime = false, nil, 0 end
+        if sapphireBBState.AutoBall == ball and target ~= localPlayer.Name then sapphireBBState.AutoBall = nil end
+        if features.Ball.Target == ball and target ~= localPlayer.Name then features.Ball.Target = nil end
+        if u1070.config.auto_parry and (target == localPlayer.Name or #features.Ball.GetAllBalls() > 1) then F.QueueAuto() end
+    end
+    function F.OnAutoFromChanged(ball, state)
+        local sender = ball:GetAttribute("from")
+         
+        if type(sender) ~= "string" or sender == "" then return end
+        local old, oldVersion = state.AutoFrom, state.AutoFromVersion
+        state.AutoFrom = sender
+        state.AutoFromVersion = sender == localPlayer.Name and (state.AutoCycleVersion or 0) or nil
+        if F.Destroyed or u1070.config.auto_parry ~= true or compareFunction(ball) ~= localPlayer.Name then return end
+        if old == localPlayer.Name and oldVersion == (state.AutoCycleVersion or 0)
+            and sender ~= old then
+             
+             
+            state.CurveVersion = (state.CurveVersion or 0) + 1
+            state.CurveReference, state.CurveSource, state.CurveTargetDirection = nil, sender, index9(sender)
+            state.CurveReady = true
+            index13(state)
+            F.OnAutoTargetChanged(ball, state, localPlayer.Name, localPlayer.Name)
+        elseif state.AutoReservation and not F.Decision.SenderMatches(state.AutoReservation.From, sender, true) then
+            F.QueueAuto()
+        end
+    end
+    function F.OnAutoBallRemoved(ball)
+        if F.Balls[ball] then F.Predictive.Clear(F.Balls[ball]); F.Decision.Clear(F.Balls[ball]) end
+        if currentDate == ball then top, currentDate, elapsedTime = false, nil, 0 end
+        if packed == ball then packed = nil end
+        if sapphireBBState.AutoBall == ball then sapphireBBState.AutoBall = nil end
+        if sapphireBBState.ManualBall == ball then sapphireBBState.ManualBall = nil end
+        if features.Ball.Target == ball then features.Ball.Target = nil end
+    end
+    local function resolveParryBall(name, part, explicitName)
+        local id = tostring(explicitName or name)
+        local position = typeof(part) == "Instance" and part:IsA("BasePart") and part.Position
+        local named, nearest, namedDistance, nearestDistance
+        for _, ball in ipairs(features.Ball.GetAllBalls()) do
+            local distance = position and (unexecuteFunction(ball) - position).Magnitude or 0
+            if ball.Name == id and (not named or distance < namedDistance) then named, namedDistance = ball, distance end
+            if position and (not nearest or distance < nearestDistance) then nearest, nearestDistance = ball, distance end
+        end
+        return named or nearest or features.Ball.GetMainBall()
+    end
+    F.RemoteCallbacks.VisualCD = function(line, active, duration)
+        if not line then return end
+        F.SyncAutoSettings()
+        local now = os.clock()
+        if active then
+            sapphireBBState.ParryCooldownUntil = now + (tonumber(duration) or 1.3)
+            local grace = math.clamp((previous() + math.min(pingJitterMs(), 40)) / 1000 + 0.1, 0.15, 1)
+            if not (sapphireBBState.AutoBall or sapphireBBState.AutoParryAt and now - sapphireBBState.AutoParryAt <= grace)
+                and not (sapphireBBState.AutoSpamParryAt and now - sapphireBBState.AutoSpamParryAt <= grace) then
+                sapphireBBState.ExtraParryCooldownUntil = sapphireBBState.ParryCooldownUntil
+            end
+            sapphireBBState.PreclickCooldown, sapphireBBState.PreclickFired = sapphireBBState.PreclickFired or nil, nil
+            sapphireBBState.ParryActiveUntil = now + math.max(0, 0.5 - (previous() + math.min(pingJitterMs(), 40)) / 2000)
+            sapphireBBState.CooldownProtected = nil
+        else
+            sapphireBBState.ParryCooldownUntil, sapphireBBState.ExtraParryCooldownUntil = nil, nil
+            sapphireBBState.AutoParryAt, sapphireBBState.AutoParryAnimationPlayed = nil, nil
+            sapphireBBState.PreclickCooldown, sapphireBBState.CooldownProtected, sapphireBBState.ManualBall = nil, nil, nil
+            if flags.TriggerbotEnabled then task.spawn(u1070.triggerbot.process)
+            elseif flags.AutoParryEnabled then F.QueueAuto() end
+        end
+    end
+    F.RemoteCallbacks.ParrySuccessAll = function(line, object, descendant, player, ballName)
+        F.SyncAutoSettings()
+        local model = localPlayer.Character
+        local vehicleRoot = model and model.PrimaryPart
+        if not vehicleRoot then return end
+        local ball = resolveParryBall(line, object, ballName)
+        if not ball then return end
+        if player == localPlayer then
+            local now = os.clock()
+            local exactBall = false
+            if u1070.config.auto_parry == true then
+                local handled, identified = F.Decision.Acknowledge(line, object, ballName, now)
+                if handled then
+                    if not identified then return end
+                    ball, exactBall = identified, true
+                end
+            end
+            local grace = math.clamp((tonumber(previous()) or 0) / 1000 + math.min((tonumber(pingJitterMs()) or 0) / 1500, 0.04) + 0.001, 0.15, 1)
+            local autoBall = not exactBall and sapphireBBState.AutoBall
+            local autoState = autoBall and managerObject[autoBall]
+            local recent = autoBall and autoBall.Parent and autoState and autoState.AutoParryAt and now - autoState.AutoParryAt <= grace
+            if not recent then autoBall = ball end
+            local state = index7(autoBall)
+            local automatic = recent or state.AutoParryAt and now - state.AutoParryAt <= grace
+            local manual = not automatic
+            if manual then
+                state.Parried, state.ParryResetAt = true, now + 0.6
+                top, currentDate, elapsedTime = true, autoBall, state.ParryResetAt
+            end
+            state.AutoParryAt = nil
+            if sapphireBBState.AutoBall == autoBall then sapphireBBState.AutoBall = nil end
+            if manual and compareFunction(autoBall) == localPlayer.Name then
+                sapphireBBState.ManualBall = autoBall
+                if flags.TriggerbotEnabled then
+                    state.TriggerbotTarget, state.TriggerbotParried = localPlayer.Name, true
+                end
+            end
+            if automatic and flags.AutoParryEnabled and #features.Ball.GetAllBalls() > 1 then F.QueueAuto() end
+            return
+        end
+        local velocity = index4(ball)
+        local speed = velocity.Magnitude
+        local offset = vehicleRoot.Position - unexecuteFunction(ball)
+        local distance = offset.Magnitude
+        if speed < 0.001 or distance < 0.001 then return end
+        if flags.AutoParryEnabled and speed > 100 and typeof(object) == "Instance" and object.Parent and object.Parent ~= model and object.Parent.Parent == smallest and not top then
+            local closest = features.Player.GetClosest()
+            if closest and closest.PrimaryPart and (vehicleRoot.Position - closest.PrimaryPart.Position).Magnitude < 15
+                and distance < 15 and offset.Unit:Dot(velocity.Unit) > -0.25 and index15(ball) then
+                top, currentDate, elapsedTime = true, ball, os.clock() + 0.6
+                if not attemptAutoParry(nil, nil, nil, nil, nil, flags.ParryAccuracy or 50) then top, currentDate = false, nil end
+            end
+        end
+    end
+     
+    F.RemoteCallbacks.InfinityBall = function(_, active)
+        local previousState = sapphireBBState.InfinityActive
+        if active then
+            if updateFunction("Infinity") then sapphireBBState.InfinityActive, sapphireBBState.InfinityParried = true, false end
+        elseif previousState then
+            sapphireBBState.InfinityActive = false
+            if flags.InfinityDetection then task.defer(function()
+                if F.Destroyed then return end
+                F.SyncAutoSettings()
+                if not flags.AutoParryEnabled or sapphireBBState.InfinityParried then return end
+                local ball = features.Ball.GetMainBall()
+                local char = localPlayer.Character
+                local root = char and char.PrimaryPart
+                if not ball or not root or compareFunction(ball) ~= localPlayer.Name or (unexecuteFunction(ball) - root.Position).Magnitude > 10 then return end
+                local state = index7(ball)
+                state.Parried, state.ParryResetAt = true, os.clock() + 0.6
+                top, currentDate, elapsedTime = true, ball, state.ParryResetAt
+                sapphireBBState.InfinityParried = true
+                if not attemptAutoParry(ball, flags.AutoParryType, true) then
+                    state.Parried, state.ParryResetAt = false, 0
+                    top, currentDate, sapphireBBState.InfinityParried = false, nil, false
+                end
+            end) end
+        end
+    end
+    F.SyncAutoSettings()
+    F.SetAutoLoop(u1070.config.parry_loop)
+    u1070.parry.process = F.StepAuto
+
+    function F.SyncTriggerSettings()
+        F.SyncAutoSettings()
+        local config = u1070.triggerbot
+        config.mode = u864.normalize_parry_method(config.mode)
+        flags.TriggerbotType = config.mode
+        flags.TriggerbotDelay = math.clamp(tonumber(config.delay) or 0, 0, 200)
+        flags.TriggerbotRandomize = config.randomize == true
+        local low = math.clamp(tonumber(config.delay_min) or 0, 0, 200)
+        local high = math.clamp(tonumber(config.delay_max) or 200, 0, 200)
+        flags.TriggerbotDelayMin, flags.TriggerbotDelayMax = math.min(low, high), math.max(low, high)
+        flags.TriggerbotIgnoreSpawn = config.ignore_spawn == true
+    end
+
+features.Triggerbot = features.Triggerbot or {}
+
+features.Triggerbot.Fire = function(line, object, descendant)
+    if F.Destroyed then return false end
+    F.SyncTriggerSettings()
+    if not flags.TriggerbotEnabled or not line or not line.Parent or F.Balls[line] ~= object then return false end
+	local osClock = os.clock()
+	local cell = sapphireBBState.ManualBall == line
+
+	if cell then
+		local targetPlayerName = localPlayer.Name
+		cell = compareFunction(line) == targetPlayerName
+	end
+
+	if not cell then
+		cell = osClock < (sapphireBBState.ExtraParryCooldownUntil or 0)
+	end
+
+	if cell then
+		return false
+	end
+	local result63 = {}
+	object.TriggerbotParried = result63
+	object.AutoParryAt = osClock
+	sapphireBBState.AutoParryAt = osClock
+	local underwater = attemptAutoParry(line, flags.TriggerbotType, true, descendant, nil, nil, true) == true
+
+	if object.TriggerbotParried == result63 then
+		object.TriggerbotParried = underwater
+	end
+
+	if not underwater then
+		if object.AutoParryAt == osClock then
+			object.AutoParryAt = nil
+		end
+
+		if sapphireBBState.AutoParryAt == osClock then
+			sapphireBBState.AutoParryAt = nil
+		end
+	end
+
+	return underwater
+end
+
+features.Triggerbot.TryParry = function(line, object, modulus)
+    if F.Destroyed then return end
+    F.SyncTriggerSettings()
+	if not flags.TriggerbotEnabled or not line or not line.Parent or not object or not index5(line) then
+		return
+	end
+	modulus = modulus or compareFunction(line)
+
+	if object.TriggerbotTarget ~= modulus then
+		if object.TriggerbotTarget and sapphireBBState.ManualBall == line then
+			sapphireBBState.ManualBall = nil
+		end
+
+		object.TriggerbotTarget = modulus
+		object.TriggerbotParried = false
+	end
+
+	local cell = not (modulus == localPlayer.Name)
+
+	if cell and sapphireBBState.ManualBall == line then
+		sapphireBBState.ManualBall = nil
+	end
+
+	local radians = cell and features.Detection.GetDribbleBall(line)
+	if cell and not radians then
+		object.TriggerbotParried = false
+		return
+	end
+
+	if object.TriggerbotParried then
+		return
+	end
+	local model = localPlayer.Character
+	if not undoFunction(model) then
+		return
+	end
+
+	if flags.TriggerbotIgnoreSpawn then
+		local callbackFunction = line:GetAttribute("from")
+		if not callbackFunction or callbackFunction == "" then
+			return
+		end
+	end
+
+	if features.Detection.BlocksParry(line, model) then
+		return
+	end
+	local angleRadians, track = features.Detection.UseProtection(model)
+	if angleRadians then
+		object.TriggerbotParried = track == true
+		return
+	end
+	local randomIndex = flags.TriggerbotDelay or 0
+
+	if flags.TriggerbotRandomize then
+		local substitution = flags.TriggerbotDelayMin or 0
+		local insertion = flags.TriggerbotDelayMax or 200
+		local remaining = math.max
+		randomIndex = math.random(math.min(substitution, insertion), remaining(substitution, insertion))
+	end
+
+	if randomIndex <= 0 then
+		features.Triggerbot.Fire(line, object, radians ~= nil)
+		return
+	end
+	local result63 = {}
+	object.TriggerbotParried = result63
+
+	task.delay(randomIndex / 1000, function()
+        if F.Destroyed or F.Balls[line] ~= object then return end
+        F.SyncTriggerSettings()
+			if object.TriggerbotParried ~= result63 then
+				return
+			end
+			local active = radians and features.Detection.GetDribbleBall(radians) == radians
+			local isArray = not flags.TriggerbotEnabled or not line.Parent or not index5(line)
+
+			if not isArray then
+				local targetPlayerName = localPlayer.Name
+				isArray = compareFunction(line) ~= targetPlayerName and not active
+			end
+
+			if isArray or features.Detection.BlocksParry(line, localPlayer.Character) then
+				object.TriggerbotParried = false
+				return
+			end
+			object.TriggerbotParried = false
+			features.Triggerbot.Fire(line, object, active and true or false)
+		end)
+end
+
+features.Triggerbot.Update = function()
+    if F.Destroyed then return end
+    F.SyncTriggerSettings()
+	if not flags.TriggerbotEnabled then
+		return
+	end
+
+	for _, particle in features.Ball.GetAllBalls() do
+		features.Triggerbot.TryParry(particle, index7(particle))
+	end
+end
+
+
+     
+    function F.ResetTriggerTokens()
+        for _, state in pairs(F.Balls) do
+            state.TriggerbotParried, state.TriggerbotTarget = false, nil
+        end
+        u1070.triggerbot.is_parrying = false
+    end
+    function F.StepTrigger()
+        if F.Destroyed or F.TriggerBusy then return end
+        F.TriggerBusy = true
+        local ok, err = xpcall(features.Triggerbot.Update, debug.traceback)
+        F.TriggerBusy = false
+        if not ok and os.clock() - (F.TriggerErrorAt or -math.huge) > 5 then
+            F.TriggerErrorAt = os.clock()
+            warn("[Allusive Private] Triggerbot: " .. tostring(err))
+        end
+    end
+    function F.RefreshModeCard(which, enabled)
+        local card = F.ModeCards and F.ModeCards[which]
+        if card and card._state ~= enabled and not (which == "Triggerbot" and u1070.config.is_mobile) then
+            F.SyncingModeUI = true
+            local ok, err = pcall(function() card:change_state(enabled) end)
+            F.SyncingModeUI = false
+            if not ok then warn("[Allusive Private] Mode UI: " .. tostring(err)) end
+        end
+        if which == "Triggerbot" then
+            local panel = u1070.mobile_guis and u1070.mobile_guis.triggerbot
+            if panel and panel.label then panel.label.Text = enabled and "ON" or "Trigger" end
+        end
+    end
+    function F.SetTriggerEnabled(enabled)
+        if F.Destroyed or F.SyncingModeUI then return end
+        enabled = enabled == true
+        if u1070.triggerbot.enabled == enabled then
+            F.SyncTriggerSettings()
+            return
+        end
+        if enabled then
+            sapphireBBState.AutoParryTriggerbot = nil
+            sapphireBBState.TriggerbotAutoParry = u1070.config.auto_parry or nil
+            if u1070.config.auto_parry then
+                u1070.config.auto_parry = false
+                A.Reset(false)
+                F.RefreshModeCard("Auto Parry", false)
+            end
+        end
+        u1070.triggerbot.enabled = enabled
+        F.SyncTriggerSettings()
+        F.Disconnect("Triggerbot")
+        u1070.triggerbot.connection = nil
+        F.ResetTriggerTokens()
+        if enabled then
+            F.ResetAutoState()
+            F.StepTrigger()
+            u1070.triggerbot.connection = connect("Triggerbot", runService.PreSimulation, F.StepTrigger)
+        else
+            local restoreAuto = sapphireBBState.TriggerbotAutoParry
+            sapphireBBState.TriggerbotAutoParry = nil
+            if restoreAuto then
+                u1070.config.auto_parry = true
+                F.ResetAutoState()
+                F.SyncAutoSettings()
+                F.RefreshModeCard("Auto Parry", true)
+                F.QueueAuto()
+            end
+        end
+        F.RefreshModeCard("Triggerbot", enabled)
+    end
+    features.Triggerbot.SetEnabled = F.SetTriggerEnabled
+    function F.SetTriggerOption(key, value)
+        if F.Destroyed then return end
+        local config = u1070.triggerbot
+        if key == "mode" then
+            config.mode = u864.normalize_parry_method(value)
+        elseif key == "delay" then
+            config.delay = math.clamp(math.floor((tonumber(value) or 0) + 0.5), 0, 200)
+        elseif key == "randomize" then config.randomize = value == true
+        elseif key == "delay_min" or key == "delay_max" then
+            config[key] = math.clamp(math.floor((tonumber(value) or 0) + 0.5), 0, 200)
+        elseif key == "ignore_spawn" then config.ignore_spawn = value == true
+        else return end
+        F.SyncTriggerSettings()
+    end
+    function F.OnTriggerTargetChanged(ball, state, target)
+        if F.Destroyed then return end
+        F.SyncTriggerSettings()
+        if flags.TriggerbotEnabled then features.Triggerbot.TryParry(ball, state, target) end
+    end
+    function F.OnTriggerBallAvailable(ball)
+        if F.Destroyed then return end
+        F.SyncTriggerSettings()
+        if flags.TriggerbotEnabled then features.Triggerbot.TryParry(ball, index7(ball)) end
+    end
+    do
+    local function initializeDeathPreclick()
+     
+     
+    local C = {Queue = {}, Connections = {}, Revision = 0, Active = false}
+    F.PreclickAll = C
+    local function enabled()
+        return not F.Destroyed and u1070.config.kill_pre_click == true and u1070.config.preclick_for_all == true
+    end
+    local function characterReady()
+        local character = localPlayer.Character
+        local root = character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart"))
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        if not root or not humanoid or humanoid.Health <= 0 or character.Parent ~= workspace:FindFirstChild("Alive")
+            or continuation(character) or character:GetAttribute("DEATH_SLASH_STANCE")
+            or character:GetAttribute("IsRagingDeflection") or character:GetAttribute("IsRapture")
+            or updateFunction("Infinity") or updateFunction("Forcefield") then return nil end
+        return character
+    end
+    local function victimCharacter(value)
+        if typeof(value) == "Instance" then
+            if value:IsA("Player") then return value.Character end
+            if value:IsA("Model") then return value end
+            return value:FindFirstAncestorWhichIsA("Model")
+        end
+        if type(value) == "string" then
+            local player = playersService:FindFirstChild(value)
+            local alive = workspace:FindFirstChild("Alive")
+            return player and player.Character or alive and alive:FindFirstChild(value)
+        end
+    end
+    local function speedOf(ball)
+        local ok, velocity = pcall(index4, ball)
+        if ok and typeof(velocity) == "Vector3" then
+            local speed = velocity.Magnitude
+            if speed == speed and speed < math.huge then return speed end
+        end
+        return 0
+    end
+    local function currentSpeed()
+        local fastest = 0
+        local ok, records = pcall(u1070.ball.get_all)
+        if ok and type(records) == "table" then
+            for _, record in ipairs(records) do fastest = math.max(fastest, speedOf(record.model or record.part)) end
+        end
+        return fastest
+    end
+    function C.Stop()
+        C.Revision += 1
+        C.Active = false
+        F.Disconnect("Preclick For All Queue")
+        for _, connection in ipairs(C.Connections) do connection:Disconnect() end
+        table.clear(C.Connections)
+        table.clear(C.Queue)
+        C.Lives = setmetatable({}, {__mode = "k"})
+        C.Players = setmetatable({}, {__mode = "k"})
+        C.Characters = setmetatable({}, {__mode = "k"})
+        C.Folders = setmetatable({}, {__mode = "k"})
+        C.VFXConnected = false
+    end
+    local function listen(signal, callback)
+        if not signal then return end
+        local revision = C.Revision
+        local connection = signal:Connect(function(...)
+            if revision == C.Revision and enabled() then callback(...) end
+        end)
+        table.insert(C.Connections, connection)
+        return connection
+    end
+    local function flush()
+        if not enabled() then C.Stop(); return end
+        for i = #C.Queue, 1, -1 do
+            local entry = C.Queue[i]
+            if os.clock() >= entry.FireAt then
+                table.remove(C.Queue, i)
+                local threshold = tonumber(u1070.config.kill_pre_click_speed) or 1
+                if characterReady() == entry.Character and (threshold <= 1 or entry.Speed >= threshold) then
+                    local previous = sapphireBBState.PreclickFired
+                    sapphireBBState.PreclickFired = true
+                    if not pcall(u1070.parry.execute) then sapphireBBState.PreclickFired = previous end
+                end
+            end
+        end
+        if #C.Queue == 0 then F.Disconnect("Preclick For All Queue") end
+    end
+    function C.OnDeath(victim, ball)
+        if not enabled() or not C.Active then return end
+        local character = characterReady()
+        victim = victimCharacter(victim)
+        if not character or not victim or victim == character or victim.Name == localPlayer.Name then return end
+        local humanoid = victim:FindFirstChildOfClass("Humanoid")
+        local life = C.Lives[victim]
+        if not life or humanoid and life.Humanoid ~= humanoid then
+            life = {Humanoid = humanoid}; C.Lives[victim] = life
+        end
+         
+        if life.Queued then return end
+        local speed = ball and speedOf(ball) or currentSpeed()
+        local threshold = tonumber(u1070.config.kill_pre_click_speed) or 1
+        if threshold > 1 and speed < threshold then return end
+        life.Queued = true
+        table.insert(C.Queue, {FireAt = os.clock() + 0.135, Character = character, Speed = speed})
+        if not F.Connections["Preclick For All Queue"] then connect("Preclick For All Queue", runService.Heartbeat, flush) end
+    end
+    function C.OnVFX(_, _, ball, victim, _, killed)
+         
+        if killed == true then C.OnDeath(victim, ball) end
+    end
+    local function watchCharacter(character)
+        if not character or C.Characters[character] then return end
+        C.Characters[character] = true
+        local function watchHumanoid(humanoid)
+            if not humanoid:IsA("Humanoid") then return end
+            local existing = C.Lives[character]
+            if existing and existing.Humanoid == humanoid and existing.Watched then return end
+            local life = existing and existing.Humanoid == humanoid and existing or {Humanoid = humanoid}
+            life.Watched, life.Health = true, humanoid.Health
+            C.Lives[character] = life
+            listen(humanoid.Died, function()
+                if character == localPlayer.Character then
+                    table.clear(C.Queue); F.Disconnect("Preclick For All Queue")
+                else C.OnDeath(character) end
+            end)
+            listen(humanoid.HealthChanged, function(health)
+                if life.Health <= 0 and health > 0 then life.Queued = nil end
+                life.Health = health
+            end)
+        end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then watchHumanoid(humanoid) end
+        listen(character.ChildAdded, watchHumanoid)
+    end
+    local function watchPlayer(player)
+        if C.Players[player] then return end
+        C.Players[player] = true
+        if player.Character then watchCharacter(player.Character) end
+        listen(player.CharacterAdded, function(character)
+            if player == localPlayer then table.clear(C.Queue); F.Disconnect("Preclick For All Queue") end
+            watchCharacter(character)
+        end)
+    end
+    local function watchFolder(folder)
+        if folder.Name ~= "Alive" or C.Folders[folder] then return end
+        C.Folders[folder] = true
+        for _, character in ipairs(folder:GetChildren()) do
+            if character:IsA("Model") then watchCharacter(character) end
+        end
+        listen(folder.ChildAdded, function(character) if character:IsA("Model") then watchCharacter(character) end end)
+    end
+    function C.HandlesKilled()
+         
+        return enabled() and C.Active
+    end
+    function C.Sync()
+        C.Stop()
+        if not enabled() then return end
+        C.Active = true
+        for _, player in ipairs(playersService:GetPlayers()) do watchPlayer(player) end
+        listen(playersService.PlayerAdded, watchPlayer)
+        for _, folder in ipairs(workspace:GetChildren()) do watchFolder(folder) end
+        listen(workspace.ChildAdded, watchFolder)
+         
+        local revision = C.Revision
+        local ok, remote = pcall(function()
+            local controllers = replicatedStorage:FindFirstChild("Controllers")
+            local module = controllers and controllers:FindFirstChild("VFXController")
+            local upvalues = getupvalues or (debug and debug.getupvalues)
+            if not module or type(upvalues) ~= "function" then return nil end
+            local controller = require(module)
+            for _, value in pairs(upvalues(controller.Start)) do
+                if typeof(value) == "Instance" and value:IsA("RemoteEvent") then return value end
+            end
+        end)
+        if revision ~= C.Revision or not enabled() then return end
+        if ok and remote then C.VFXConnected = listen(remote.OnClientEvent, C.OnVFX) ~= nil end
+    end
+    end
+    initializeDeathPreclick()
+    end
+
+    F.Triggerbot = features.Triggerbot
+    u1070.triggerbot.process = F.StepTrigger
+    u1070.triggerbot.set = F.SetTriggerEnabled
+    F.SyncTriggerSettings()
+
+    for _, instance in replicatedStorage:GetDescendants() do bindEvent(instance) end
+    connect("RemoteAdded", replicatedStorage.DescendantAdded, bindEvent)
+    for _, folder in workspace:GetChildren() do
+        if folder.Name == "Balls" or folder.Name == "TrainingBalls" then watchFolder(folder) end
+    end
+    connect("FolderAdded", workspace.ChildAdded, function(folder)
+        if folder.Name == "Balls" or folder.Name == "TrainingBalls" then watchFolder(folder) end
+    end)
+    connect("Character", localPlayer.CharacterAdded, resetCharacter)
+    connect("Input", u1056.InputBegan, function(input, processed)
+        if not processed and input.KeyCode == Enum.KeyCode.Q then detectFuryAbility() end
+    end)
+    connect("LightingAdded", Workspace.ChildAdded, lightingChild)
+    for _, child in Workspace:GetChildren() do lightingChild(child) end
+    connect("PhantomLoop", runService.Heartbeat, F.UpdatePhantom)
+    if u839 then connect("Cleanup", u839.Destroying, F.Destroy) end
+     
+    u1070.ball.get_targeted = F.GetTargets
+    u1070.ball.is_curved = F.IsCurved
+    u1070.ball.check_tornado = F.CheckTornado
+end
+
+ 
+do
+    local F = u1070.sapphire
+    local M = {Features = {}, Flags = F.Flags, Loaders = {}, Loaded = {}, Errors = {},
+        Tasks = setmetatable({}, {__mode = "k"}), Ready = false, Desired = false, Revision = 0}
+    u1070.sapphire_misc = M
+    local features, flags = M.Features, M.Flags
+    local localPlayer, playersService, replicatedStorage, runService = u1061, u1054, u1057, u1055
+    local httpService, teleportService = game:GetService("HttpService"), game:GetService("TeleportService")
+    local newCharacter = localPlayer:FindFirstChildOfClass("PlayerGui")
+    local globalEnvironment = type(getgenv) == "function" and getgenv() or _G
+    local configData = u864._config
+    local saved = type(configData.UnlockAll) == "table" and configData.UnlockAll or {}
+    flags.UnlockAllEnabled, flags.DeviceSpoofType = false, "PC"
+    flags.UnlockAllSword, flags.UnlockAllExplosion = saved.Sword or "", saved.Explosion or ""
+    flags.UnlockAllEmotes, flags.UnlockAllFinishers = saved.Emotes or {}, saved.Finishers or {}
+    flags.UnlockAllAccessory, flags.UnlockAllFavorites = saved.Accessory == true, saved.Favorites or {}
+    local function saveConfig() u867:save(game.GameId, u864._config) end
+    local function notify(text)
+        if not M.Destroyed then u864.SendNotification({title = "Allusive Private", text = text, duration = 6}) end
+    end
+    M.Notify = notify
+    local window = {Notify = function(_, data) notify(data.Title or data.Text or "") end}
+    local function cleanupResources(value, seen)
+        if value == nil then return end
+        if typeof(value) == "RBXScriptConnection" then pcall(function() value:Disconnect() end)
+        elseif type(value) == "thread" then
+            if value ~= coroutine.running() and coroutine.status(value) ~= "dead" then pcall(task.cancel, value) end
+        elseif type(value) == "table" then
+            if type(value.Disconnect) == "function" then pcall(value.Disconnect, value); return end
+            seen = seen or {}; if seen[value] then return end; seen[value] = true
+            for _, child in pairs(value) do cleanupResources(child, seen) end
+        end
+    end
+    function M.Try(name, fn, ...)
+        local ok, result = pcall(fn, ...)
+        if ok then M.Errors[name] = nil; return true, result end
+        if M.Errors[name] ~= tostring(result) then
+            M.Errors[name] = tostring(result)
+            notify(name .. ": unavailable or incompatible with this game/executor. " .. tostring(result))
+        end
+        return false, result
+    end
+    local baseTask = task
+    local task = setmetatable({}, {__index = baseTask})
+    local function scheduled(method, delay, fn, ...)
+        local args = table.pack(...)
+        local function guarded()
+            if not M.Destroyed then M.Try("Inventory task", fn, table.unpack(args, 1, args.n)) end
+        end
+        local thread
+        if delay then thread = baseTask[method](delay, guarded) else thread = baseTask[method](guarded) end
+        if type(thread) == "thread" and coroutine.status(thread) ~= "dead" then M.Tasks[thread] = true end
+        return thread
+    end
+    task.defer = function(fn, ...) return scheduled("defer", nil, fn, ...) end
+    task.spawn = function(fn, ...) return scheduled("spawn", nil, fn, ...) end
+    task.delay = function(delay, fn, ...) return scheduled("delay", delay, fn, ...) end
+    local function callWithRestoredThreadIdentity(fn, ...)
+        local getter = getthreadidentity or (syn and syn.get_thread_identity)
+        local setter = setthreadidentity or (syn and syn.set_thread_identity)
+        local identity = type(getter) == "function" and getter() or nil
+        local result = table.pack(pcall(fn, ...))
+        if identity and type(setter) == "function" then pcall(setter, identity) end
+        return table.unpack(result, 1, result.n)
+    end
+    local getupvalues = getupvalues or (debug and debug.getupvalues)
+    local setupvalue = setupvalue or (debug and debug.setupvalue)
+    local getinfo = getinfo or (debug and debug.getinfo)
+     
+    features.Animation = {SwordAPI = setmetatable({}, {__index = function(_, key)
+        local api = require(replicatedStorage.Shared.SwordAPI)
+        local method = api[key]
+        if type(method) ~= "function" then return method end
+        return function(_, ...) return method(api, ...) end
+    end})}
+    features.Animation.Reset = function()
+        if u1070.oxy_manual and u1070.oxy_manual.Visual then u1070.oxy_manual.Visual.Reset(true) end
+    end
+    features.Animation.PreloadSword = function(sword)
+        task.spawn(function()
+            local character = localPlayer.Character
+            local data = features.UnlockAll and features.UnlockAll.GetSwordData(sword)
+            if not character or not data then return end
+            local list = features.Animation.SwordAPI:GetAnimations(character, {"GrabParry", "Parry", "SuccessParry"}, data.AnimationType, data.SwordType)
+            if type(list) == "table" and #list > 0 then game:GetService("ContentProvider"):PreloadAsync(list) end
+        end)
+    end
+    local queue = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+    local queue_on_teleport = function(code)
+        assert(type(queue) == "function", "Executor does not support queue_on_teleport")
+        M.DevicePayload = code
+        return queue(code)
+    end
+    M.Loaders.Device = function()
+			features.DeviceSpoof = {}
+
+			features.DeviceSpoof.Apply = function()
+				local query = [[local Source = %q
+					if not game:IsLoaded() then game.Loaded:Wait() end
+					if game.GameId ~= ]] .. tostring(game.GameId) .. [[ then return end
+					local Queue = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+					local Players = game:GetService('Players')
+					local Player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+					local Environment = getgenv()
+					if Environment.AllusiveDeviceSpoofQueue then
+						Environment.AllusiveDeviceSpoofQueue:Disconnect()
+					end
+					local Queued = false
+					Environment.AllusiveDeviceSpoofQueue = Player.OnTeleport:Connect(function()
+						if not Queued then
+							Queue(Source:format(Source))
+							Queued = true
+						end
+					end)
+					local Device = ]] .. httpService:JSONEncode(flags.DeviceSpoofType == "Mobile" and "Phone" or flags.DeviceSpoofType) .. "if game.GameId ~= " .. tostring(game.GameId) .. [[ then return end
+					local Previous = Environment.AllusiveDeviceSpoofRun
+					if Previous and Previous.JobId == game.JobId and Previous.Device == Device then return end
+					if Previous and Previous.Restore then Previous.Restore() end
+					local Run = {Device = Device, JobId = game.JobId}
+					Environment.AllusiveDeviceSpoofRun = Run
+					while not workspace:GetAttribute('ClientModulesLoaded') do
+						workspace:GetAttributeChangedSignal('ClientModulesLoaded'):Wait()
+					end
+					if Environment.AllusiveDeviceSpoofRun ~= Run then return end
+					local ReplicatedStorage = game:GetService('ReplicatedStorage')
+					local Listener = require(ReplicatedStorage:WaitForChild('ClientGameModules'):WaitForChild('DeviceListener'))
+					local Observe = Listener.Observe
+
+					local function Apply(Callback)
+						if Run.Restore then Run.Restore() end
+						task.spawn(function()
+							local Success, Result = pcall(function()
+								Callback(Device)
+								Callback(Listener.Device)
+							end)
+							if not Success then
+								Environment.AllusiveDeviceSpoofRun = nil
+								error(Result, 0)
+							end
+							Environment.AllusiveDeviceSpoofApplied = {Device = Device, JobId = game.JobId}
+						end)
+					end
+
+					for _, Connection in Listener.OnChange:GetConnections() do
+						if debug.info(Connection._fn, 's') == 'ReplicatedStorage.Controllers.PlayerProfileController' then
+							Apply(Connection._fn)
+							return
+						end
+					end
+
+					local function ObserveDevice(Self, Callback)
+						if debug.info(Callback, 's') == 'ReplicatedStorage.Controllers.PlayerProfileController' then
+							Apply(Callback)
+							return Self.OnChange:Connect(Callback)
+						end
+
+						return Observe(Self, Callback)
+					end
+
+					Run.Restore = function()
+						if Listener.Observe == ObserveDevice then Listener.Observe = Observe end
+						Run.Restore = nil
+					end
+					Listener.Observe = ObserveDevice
+					]]
+
+				local concatenated = query:format(query)
+
+				if globalEnvironment.AllusiveDeviceSpoofQueue then
+					globalEnvironment.AllusiveDeviceSpoofQueue:Disconnect()
+					globalEnvironment.AllusiveDeviceSpoofQueue = nil
+				end
+				;(queue_on_teleport or queueonteleport or syn and syn.queue_on_teleport or fluxus and fluxus.queue_on_teleport)(concatenated)
+				window:Notify({ Title = "Rejoining...", Duration = 1 })
+				task.wait(0.2)
+
+				if not pcall(teleportService.TeleportToPlaceInstance, teleportService, game.PlaceId, game.JobId, localPlayer) then
+					game.ExperienceService:LaunchExperience({ placeId = game.PlaceId, gameInstanceId = game.JobId })
+				end
+			end
+
+    end
+
+    M.Loaders.UnlockAll = function()
+	do
+		local hook = {
+			Run = 0,
+			Types = { "Sword", "Explosion" },
+			Connections = {},
+			Originals = {},
+			SavedEquipped = {},
+			Defaults = {},
+			SwordData = {},
+			Clones = {},
+			Favorites = { Sword = {}, Explosion = {}, Emote = {} },
+			Deleted = { Sword = {}, Explosion = {}, Emote = {} },
+			ShopState = {},
+			ShopChanges = {},
+			ShopItems = { Sword = {}, Explosion = {} },
+			ShopFields = {
+			{ "ItemsMatching", "ItemsMatching" },
+			{ "InDeleteMulti", "InDeleteMulti" },
+			{ "Owns", "OwnsItem" },
+			{ "Section", "Section" },
+			{ "ForceHide", "ForceHide" },
+		},
+			ShopActive = false,
+			FavoriteStates = {},
+			DefaultFavorites = {},
+			EmoteItems = {},
+			EmoteItemsList = {},
+			EmoteDisplays = {},
+			EmoteItemKeys = {},
+			EmoteBuildIndex = 1,
+			EmoteBuildToken = 0,
+			EmoteBuilding = false,
+			EmotesReady = false,
+			EmoteCatalogLoaded = false,
+			ButtonConnections = {},
+			CardConnections = {},
+			EquippedEmotes = {},
+			Finishers = {},
+			DefaultFinishers = {},
+			Overlays = {},
+			MultiDelete = { Sword = {}, Explosion = {} },
+			MultiDeleteCards = {},
+		}
+
+		features.UnlockAll = hook
+
+		hook.Add = function(line)
+			if line then
+				table.insert(hook.Connections, line)
+			end
+
+			return line
+		end
+
+		local function onInputEnded(line, object, descendant)
+			local radians = hook.Originals[line]
+
+			if radians then
+				object[descendant or line] = radians
+				hook.Originals[line] = nil
+			end
+		end
+
+		hook.GetCharacter = function()
+			local model = localPlayer.Character
+			local targetHumanoid = model and model:FindFirstChildOfClass("Humanoid")
+			if model and model.Parent and (not targetHumanoid or targetHumanoid.Health > 0) then
+				return model
+			end
+		end
+
+		hook.Load = function()
+			if hook.EmotesFolder then
+				return true
+			end
+			local tween = replicatedStorage.Controllers
+			local instance6 = replicatedStorage.Shared
+			local screenGui = require(replicatedStorage.Packages.Replion)
+			hook.InventoryClient = require(instance6.Inventory).Client
+			hook.InventoryShared = require(instance6.Inventory.Shared)
+			hook.InventoryController = require(tween.Trading.InventoryController)
+			hook.InventoryReplion = screenGui.Client:GetReplion("Inventory")
+			hook.DataReplion = screenGui.Client:GetReplion("Data")
+			hook.Shop = require(tween.UI.ShopController)
+			hook.ShopAPI = require(tween.UI.ShopControllerAPI)
+			hook.TradeInfo = require(instance6.Trading.TradeInfo)
+			hook.Swords = require(instance6.ReplicatedInstances.Swords)
+			hook.SwordFX = require(instance6.ReplicatedInstances.SwordFX)
+			hook.EmoteWheel = require(tween.EmoteWheelController)
+			hook.EmoteController = require(tween.EmoteController)
+			hook.DeletePrompt = require(tween.DeleteItemPromptController)
+			hook.FinishersController = require(tween.FinishersController)
+			hook.VFX = require(tween.VFXController)
+			hook.EmotesShared = require(instance6.EmotesShared)
+			hook.ItemInfo = require(instance6.ItemInfo)
+			hook.AwakenData = require(instance6.SecretAwakenData)
+			hook.AwakenBase = {}
+
+			for vertex, particle in pairs(hook.AwakenData) do
+				if type(particle) == "table" and particle.Awakened then
+					hook.AwakenBase[particle.Awakened.Value] = vertex
+				end
+			end
+
+			hook.Trove = require(replicatedStorage.Packages.Trove)
+			hook.EmotesFolder = replicatedStorage.Misc.Emotes
+			return true
+		end
+
+		hook.ShopReady = function()
+			local player30 = hook.Shop._virtualItems
+			if not player30 then
+				return false
+			end
+			local result21 = hook.Shop._loadInventoryPage
+
+			if result21 then
+				for _, particle in pairs(hook.Types) do
+					if player30[particle] and not next(player30[particle]) then
+						result21(particle)
+					end
+				end
+			end
+
+			local result13 = hook.Shop._inventoryPages
+			local player20 = result13 and result13.Sword
+			result13 = result13 and result13.Explosion
+			return player30.Sword and next(player30.Sword) ~= nil and player30.Explosion and next(player30.Explosion) ~= nil and player20 and player20.BatchDepth == 0 and result13 and result13.BatchDepth == 0
+		end
+
+		hook.Save = function()
+			configData.UnlockAll = configData.UnlockAll or {}
+			configData.UnlockAll.Sword = hook.AwakenBase[hook.Sword] or hook.Sword
+			configData.UnlockAll.Explosion = hook.Explosion
+			local result3 = {}
+
+			for vertex, particle in pairs(hook.EquippedEmotes) do
+				result3[tostring(vertex)] = particle
+			end
+
+			configData.UnlockAll.Emotes = result3
+			configData.UnlockAll.Accessory = hook.Accessory == true
+			configData.UnlockAll.Finishers = table.clone(hook.Finishers)
+
+			configData.UnlockAll.Favorites = {
+				Sword = table.clone(hook.Favorites.Sword),
+				Explosion = table.clone(hook.Favorites.Explosion),
+				Emote = table.clone(hook.Favorites.Emote),
+			}
+
+			flags.UnlockAllSword = configData.UnlockAll.Sword or ""
+			flags.UnlockAllExplosion = hook.Explosion or ""
+			flags.UnlockAllEmotes = configData.UnlockAll.Emotes
+			flags.UnlockAllAccessory = configData.UnlockAll.Accessory
+			flags.UnlockAllFinishers = configData.UnlockAll.Finishers
+			flags.UnlockAllFavorites = configData.UnlockAll.Favorites
+			saveConfig()
+		end
+
+		hook.LoadFavorites = function()
+			for _, particle in pairs({ "Sword", "Explosion", "Emote" }) do
+				table.clear(hook.Favorites[particle])
+				local cell = type(flags.UnlockAllFavorites) == "table" and flags.UnlockAllFavorites[particle]
+
+				if type(cell) == "table" then
+					for vertex, existingPlayer in pairs(cell) do
+						if existingPlayer == true then
+							hook.Favorites[particle][vertex] = true
+						end
+					end
+				end
+			end
+		end
+
+		hook.ApplyFavorites = function()
+			for vertex, particle in pairs(hook.Favorites) do
+				for neighbor in pairs(particle) do
+					hook.SetFavorite(vertex, neighbor, true, false)
+				end
+			end
+		end
+
+		hook.GetFavoriteState = function(line, object)
+			local query = line .. "\0" .. tostring(object)
+			local radians = hook.FavoriteStates[query]
+			if radians then
+				return radians
+			end
+			local SelectionService = hook.InventoryController:GetFavoriteState(line, object)
+
+			if SelectionService then
+				hook.FavoriteStates[query] = SelectionService
+				hook.DefaultFavorites[query] = SelectionService:Get() == true
+			end
+
+			return SelectionService
+		end
+
+		hook.GetShopFavorites = function()
+			if hook.ShopFavorites then
+				return hook.ShopFavorites
+			end
+			local player20 = hook.Shop._inventoryPages and hook.Shop._inventoryPages.Sword
+			local radians = player20 and getupvalues and getupvalues(player20.MarkDirty)
+			radians = radians and radians[2]
+			local lines = radians and getupvalues(radians)
+			lines = lines and lines[4]
+			lines = lines and getupvalues(lines) or {}
+
+			for _, existingPlayer in pairs(lines) do
+				if type(existingPlayer) == "table" and type(existingPlayer.Sword) == "table" and type(existingPlayer.Explosion) == "table" then
+					hook.ShopFavorites = existingPlayer
+					return existingPlayer
+				end
+			end
+		end
+
+		hook.SetFavorite = function(line, object, descendant, radius)
+			if not hook.Favorites[line] then
+				return
+			end
+			hook.Favorites[line][object] = descendant and true or nil
+			local radians = hook.GetFavoriteState(line, object)
+			local cell = line ~= "Emote" and hook.GetShopFavorites()
+
+			if cell and cell[line] then
+				cell[line][object] = descendant and true or nil
+				local result13 = hook.Shop._inventoryPages and hook.Shop._inventoryPages[line]
+
+				if result13 and result13.MarkDirty then
+					result13.MarkDirty(nil, true, true)
+				end
+			end
+
+			if radians then
+				radians:Set(descendant == true)
+			end
+
+			local sortedArray = hook.ConsoleItems and hook.ConsoleItems[line] and hook.ConsoleItems[line][object]
+
+			if sortedArray then
+				sortedArray.Data.IsFavorited:Set(descendant == true)
+			end
+
+			if radius ~= false then
+				hook.Save()
+			end
+		end
+
+		hook.ToggleFavorite = function(line, object)
+			hook.SetFavorite(line, object, not hook.Favorites[line][object])
+		end
+
+		hook.RestoreFavorites = function()
+			local radians = hook.GetShopFavorites()
+
+			for vertex, existingPlayer in pairs(hook.FavoriteStates) do
+				local cell = hook.DefaultFavorites[vertex] == true
+				local query = string.find(vertex, "\0", 1, true)
+				local concatenated = query and string.sub(vertex, 1, query - 1)
+				query = query and string.sub(vertex, query + 1)
+
+				if radians and radians[concatenated] and query then
+					radians[concatenated][query] = cell and true or nil
+				end
+
+				existingPlayer:Set(cell)
+			end
+
+			for _, existingPlayer in pairs(hook.Types) do
+				local result13 = hook.Shop._inventoryPages and hook.Shop._inventoryPages[existingPlayer]
+
+				if result13 then
+					result13.MarkDirty(nil, true, true)
+				end
+			end
+
+			table.clear(hook.FavoriteStates)
+			table.clear(hook.DefaultFavorites)
+		end
+
+		hook.GetShopState = function(arguments,key)local y=arguments and arguments[key];if type(y)=="table"and type(y.Get)=="function"then return y:Get();end;return y;end
+		hook.ApplyShopState = function(arguments,key,callback)local currentLength=arguments and arguments[key];if type(currentLength)=="table"and type(currentLength.Set)=="function"then currentLength:Set(callback);elseif arguments then arguments[key]=callback;end;end
+
+		hook.SetShopState = function(line, object)
+			if not line then
+				return
+			end
+			local radians = hook.ShopState[line]
+			if not radians then
+				return
+			end
+			local lines = hook.ShopChanges[line]
+			local cell = false
+
+			for _, existingPlayer in pairs(hook.ShopFields) do
+				local track = existingPlayer[1]
+				local vertexCount = existingPlayer[2]
+				local steering = object[track]
+
+				if steering ~= nil then
+					local major = hook.GetShopState(line, vertexCount)
+
+					if major ~= steering then
+						hook.ApplyShopState(line, vertexCount, steering)
+						lines = lines or {}
+
+						if lines[track] == nil then
+							lines[track] = major
+						elseif lines[track] == steering then
+							lines[track] = nil
+						end
+
+						cell = true
+					end
+
+					radians[track] = steering
+				end
+			end
+
+			if lines then
+				hook.ShopChanges[line] = next(lines) and lines or nil
+			end
+
+			local result13 = hook.Shop._inventoryPages and hook.Shop._inventoryPages[line.Type]
+
+			if cell and result13 and result13.MarkDirty and result13.BatchDepth == 0 then
+				result13.MarkDirty(line, false, true)
+			end
+
+			if cell and hook.ConsoleItems then
+				hook.SyncConsoleItem(line)
+			end
+		end
+
+		hook.IsUnlockItem = function(line)
+			local radians = "table"
+			local cell = type(line) == radians
+
+			if cell then
+				cell = tostring(line.Id or ""):match("^UnlockAll:") ~= nil
+			end
+
+			return cell
+		end
+
+		hook.GetOwnedItem = function(line, object)
+			local radians = hook.InventoryClient:FindItems(line, object)
+			local cell = type(radians) == "table" and radians[1]
+			local accessoryPrototype = cell and hook.InventoryClient:GetItem(line, cell)
+
+			if accessoryPrototype and not hook.IsUnlockItem(accessoryPrototype) then
+				local angleRadians = table.clone(accessoryPrototype)
+				angleRadians.Id = angleRadians.Id or cell
+				return angleRadians
+			end
+
+			local lines = hook.InventoryClient:GetInventory()[line] or {}
+
+			for _, existingPlayer in pairs(lines) do
+				if existingPlayer.Name == object and not hook.IsUnlockItem(existingPlayer) then
+					return existingPlayer
+				end
+			end
+		end
+
+		hook.GetRealEquipped = function(line)
+			local instance2 = hook.InventoryClient:GetEquipped(line)
+			if not hook.IsUnlockItem(instance2) then
+				return instance2
+			end
+			return hook.GetOwnedItem(line, instance2.Name)
+		end
+
+		hook.ActivateShop = function()
+			if hook.ShopActive then
+				return true
+			end
+			hook.ShopActive = true
+			table.clear(hook.ShopState)
+			table.clear(hook.ShopChanges)
+			local HOOK_ORIGINAL_RUN = hook.Run
+			local difference = os.clock() + 0.004
+			local File = hook.Shop
+			local result13 = File._inventoryPages
+			local result47 = hook.ShopState
+			local result46 = hook.ShopItems
+			local heap = hook.Deleted
+
+			local function handlePlayerRemoving(line)
+				if os.clock() < difference then
+					return true
+				end
+				runService.Heartbeat:Wait()
+
+				if hook.Run ~= HOOK_ORIGINAL_RUN or hook.Status ~= "active" then
+					if line and line.EndBatch then
+						line.EndBatch()
+					end
+
+					return false
+				end
+
+				difference = os.clock() + 0.004
+				return true
+			end
+
+			for _, particle in pairs(hook.Types) do
+				local angleRadians = result13 and result13[particle]
+
+				if angleRadians and angleRadians.BeginBatch then
+					angleRadians.BeginBatch()
+				end
+
+				local lines = File._virtualItems[particle] or {}
+				local track = result46[particle]
+				local sourceTable = {}
+				table.clear(track)
+
+				for _, modelName in pairs(lines) do
+					local targetPlayerName = modelName.Name
+
+					if targetPlayerName and targetPlayerName ~= "Random" then
+						local cell = hook.GetShopState(modelName, "OwnsItem")
+
+						local players = {
+							Owns = cell,
+							Section = hook.GetShopState(modelName, "Section"),
+							ForceHide = hook.GetShopState(modelName, "ForceHide"),
+							ItemsMatching = hook.GetShopState(modelName, "ItemsMatching"),
+							InDeleteMulti = hook.GetShopState(modelName, "InDeleteMulti"),
+							Virtual = cell ~= true,
+						}
+
+						result47[modelName] = players
+						local steering = track[targetPlayerName]
+
+						if not steering then
+							track[targetPlayerName] = modelName
+							cell = cell and not players.ForceHide or nil
+							sourceTable[targetPlayerName] = cell
+						elseif not sourceTable[targetPlayerName] then
+							local major = result47[steering]
+
+							if cell and not players.ForceHide then
+								track[targetPlayerName] = modelName
+								sourceTable[targetPlayerName] = true
+							elseif cell and not major.Owns then
+								track[targetPlayerName] = modelName
+							elseif major.ForceHide and not players.ForceHide then
+								track[targetPlayerName] = modelName
+							end
+						end
+					end
+
+					if not handlePlayerRemoving(angleRadians) then
+						return false
+					end
+				end
+
+				for _, modelName in pairs(lines) do
+					local targetPlayerName = modelName.Name
+
+					if targetPlayerName and targetPlayerName ~= "Random" then
+						local steering = result47[modelName]
+						local major = table.clone(steering)
+
+						if modelName == track[targetPlayerName] then
+							local byte = heap[particle][targetPlayerName]
+							local withinY = particle == "Sword" and hook.AwakenBase[targetPlayerName] ~= nil
+							local characters = steering.ItemsMatching or {}
+
+							if byte or withinY then
+								characters = {}
+							elseif #characters == 0 then
+								characters = { "UnlockAll:" .. targetPlayerName }
+							end
+
+							steering.ItemsMatching = characters
+							steering.InDeleteMulti = 0
+							steering.Owns = #characters > 0
+							steering.Section = steering.Owns and "Owned" or "Unowned"
+							steering.ForceHide = withinY
+						else
+							steering.ForceHide = true
+						end
+
+						local players = {}
+
+						for _, partTemplate in pairs(hook.ShopFields) do
+							if steering[partTemplate[1]] ~= major[partTemplate[1]] then
+								players[partTemplate[1]] = major[partTemplate[1]]
+							end
+						end
+
+						hook.ShopChanges[modelName] = next(players) and players or nil
+					end
+
+					if not handlePlayerRemoving(angleRadians) then
+						return false
+					end
+				end
+
+				for _, modelName in pairs(lines) do
+					local steering = hook.ShopChanges[modelName]
+
+					if steering then
+						for _, weld in pairs(hook.ShopFields) do
+							if steering[weld[1]] ~= nil then
+								hook.ApplyShopState(modelName, weld[2], result47[modelName][weld[1]])
+							end
+						end
+					end
+				end
+
+				if angleRadians and angleRadians.MarkDirty then
+					angleRadians.MarkDirty(nil, false, true)
+				end
+
+				if angleRadians and angleRadians.EndBatch then
+					angleRadians.EndBatch()
+				end
+			end
+
+			return true
+		end
+
+		hook.RestoreShop = function()
+			if not hook.ShopActive then
+				return
+			end
+			hook.ShopActive = false
+			local result13 = hook.Shop._inventoryPages
+
+			for _, particle in pairs(hook.Types) do
+				local angleRadians = result13 and result13[particle]
+
+				if angleRadians and angleRadians.BeginBatch then
+					angleRadians.BeginBatch()
+				end
+			end
+
+			for vertex, particle in pairs(hook.ShopChanges) do
+				for _, existingPlayer in pairs(hook.ShopFields) do
+					if particle[existingPlayer[1]] ~= nil then
+						hook.ApplyShopState(vertex, existingPlayer[2], particle[existingPlayer[1]])
+					end
+				end
+			end
+
+			for _, particle in pairs(hook.Types) do
+				local angleRadians = result13 and result13[particle]
+
+				if angleRadians and angleRadians.MarkDirty then
+					angleRadians.MarkDirty(nil, false, true)
+				end
+
+				if angleRadians and angleRadians.EndBatch then
+					angleRadians.EndBatch()
+				end
+			end
+
+			table.clear(hook.ShopState)
+			table.clear(hook.ShopChanges)
+			table.clear(hook.ShopItems.Sword)
+			table.clear(hook.ShopItems.Explosion)
+		end
+
+		hook.GetSelected = function()
+			local endTime = hook.Console
+
+			if endTime then
+				local timestamp = endTime:GetCurrentPage()
+				local targetPlayerName = endTime.PageInfo[timestamp]
+				targetPlayerName = targetPlayerName and targetPlayerName.ItemState:Get()
+				targetPlayerName = targetPlayerName and targetPlayerName.ItemInfo.Name
+				if hook.ShopItems[timestamp] and targetPlayerName then
+					return timestamp, targetPlayerName, hook.ShopItems[timestamp][targetPlayerName]
+				end
+				return
+			end
+
+			local definition = hook.Shop and hook.Shop._selectedItem
+			local index57 = definition and definition.type
+			definition = definition and definition.name
+			if (index57 == "Sword" or index57 == "Explosion") and definition then
+				return index57, definition, hook.ShopItems[index57][definition]
+			end
+		end
+
+		hook.MakeOverlay = function(line, hitboxPart, object)
+			if not hitboxPart then
+				return
+			end
+			local containerFrame = Instance.new("TextButton")
+			containerFrame.Name = "UnlockAll" .. line
+			containerFrame.Text = ""
+			containerFrame.AutoButtonColor = false
+			containerFrame.BackgroundTransparency = 1
+			containerFrame.BorderSizePixel = 0
+			containerFrame.Size = UDim2.new(1, 0, 1, 0)
+			containerFrame.ZIndex = 100
+			containerFrame.Visible = false
+			containerFrame.Parent = hitboxPart
+			hook.Add(containerFrame.Activated:Connect(object))
+			hook.Overlays[line] = containerFrame
+		end
+
+		hook.RefreshShop = function()
+			if hook.Console then
+				return
+			end
+			local radians, angleRadians, track = hook.GetSelected()
+			local result76 = hook.Status == "active" and track ~= nil and not hook.Shop._multiDelete and hook.Deleted[radians][angleRadians] ~= true
+			local rope = hook.Overlays.Favorite
+			local cash = hook.Overlays.Delete
+			local right = hook.Overlays.Accessory
+			local constraint = hook.Overlays.Finisher
+
+			if rope then
+				rope.Visible = result76
+			end
+
+			if right then
+				right.Visible = false
+			end
+
+			if constraint then
+				constraint.Visible = false
+			end
+
+			track = track and hook.ShopState[track]
+			local result32 = result76 and track ~= nil and track.Owns
+
+			if cash then
+				cash.Visible = result32 and track ~= nil
+			end
+
+			local File = newCharacter:FindFirstChild("Shop")
+			File = File and File:FindFirstChild("Holder")
+
+			if (radians == "Sword" or radians == "Explosion") and File and File:FindFirstChild("Favorite") then
+				File.Favorite.Visible = result32
+
+				if result32 then
+					local cell = hook.Favorites[radians][angleRadians] == true
+					File.Favorite.Image = cell and "rbxassetid://15697987058" or "rbxassetid://15697981750"
+					File.Favorite.HoverImage = cell and "rbxassetid://15697983062" or "rbxassetid://15697987058"
+				end
+			end
+
+			File = File and File:FindFirstChild("InfoBG")
+
+			if File and File:FindFirstChild("SecretUpgrade") then
+				File.SecretUpgrade.Visible = result32 and radians == "Sword" and hook.AwakenData[angleRadians] ~= nil
+			end
+
+			local cell = radians and angleRadians and hook.Deleted[radians][angleRadians] == true
+
+			if File and File:FindFirstChild("Delete") then
+				File.Delete.Visible = cash and cash.Visible or false
+			end
+
+			local characterModel = File and File:FindFirstChild("BuyButton")
+
+			if File and cell then
+				for _, modelName in pairs({
+					"BuyButton",
+					"GiftButton",
+					"UpgradeButton",
+					"Finisher",
+					"ChangeStyle",
+					"EquipAccessory",
+					"SecretUpgrade",
+					"CharacterUpgradeButton",
+					"UpgradesInfoButton",
+					"Equips",
+				}) do
+					local steering = File:FindFirstChild(modelName)
+
+					if steering and steering:IsA("GuiObject") then
+						steering.Visible = false
+					end
+				end
+			end
+
+			if characterModel and result32 and track and track.Virtual then
+				local active = radians == "Sword" and hook.Sword == angleRadians or radians == "Explosion" and hook.Explosion == angleRadians
+				characterModel.Visible = true
+				characterModel.Active = true
+
+				if characterModel:FindFirstChild("PriceTag") then
+					local optionContainer = characterModel.PriceTag:FindFirstChild("Price")
+					local nameLabel = characterModel.PriceTag:FindFirstChild("TextLabel")
+
+					if optionContainer then
+						optionContainer.Visible = false
+					end
+
+					if nameLabel then
+						nameLabel.Text = active and "Equipped" or "Equip"
+					end
+				end
+			end
+
+			if radians == "Sword" and result32 and track and track.Virtual and File and File:FindFirstChild("Equips") then
+				local list = hook.Shop._selectedItem and hook.Shop._selectedItem.data
+				local drawingObject = File.Equips:FindFirstChild("Finisher")
+				local ropeConstraint = File.Equips:FindFirstChild("EquipAccessory")
+
+				if drawingObject and list and list.HasFinisher then
+					drawingObject.Visible = true
+
+					if constraint then
+						constraint.Visible = true
+					end
+
+					drawingObject.ImageColor3 = Color3.new(1, 1, 1)
+					drawingObject.Label.Text = hook.Finishers[angleRadians] and "UNEQUIP" or "EQUIP"
+				end
+
+				if ropeConstraint and list and list.AccessoryToggleable and hook.Sword == angleRadians then
+					ropeConstraint.Visible = true
+
+					if right then
+						right.Visible = true
+					end
+
+					ropeConstraint.Label.Text = hook.Accessory and "UNEQUIP ACCESSORY" or "EQUIP ACCESSORY"
+				end
+			end
+
+			if hook.Shop._multiDelete then
+				hook.Shop:_updateMultiDeleteVisbility()
+			end
+		end
+
+		hook.SetAccessory = function(line)
+			hook.Accessory = line == true
+			localPlayer:SetAttribute("ShowSwordAccessory", hook.Accessory)
+
+			if hook.Accessory and hook.Sword then
+				hook.ApplySword(hook.Sword)
+			elseif not hook.Accessory then
+				local radians = hook.GetCharacter()
+				local result54 = radians and radians:FindFirstChild("SwordAccessories")
+
+				if result54 then
+					result54:Destroy()
+				end
+			end
+
+			hook.Save()
+			hook.RefreshShop()
+
+			for vertex in pairs(hook.Clones) do
+				hook.UpdateClone(vertex)
+			end
+		end
+
+		hook.SetFinisher = function(line, object)
+			if not line then
+				return
+			end
+			local lines = { "Finishers", "Equipped", line }
+
+			if hook.DefaultFinishers[line] == nil and hook.DataReplion then
+				hook.DefaultFinishers[line] = hook.DataReplion:Get(lines) == true
+			end
+
+			hook.Finishers[line] = object and true or nil
+
+			if hook.DataReplion then
+				hook.DataReplion:_set(lines, object == true)
+			end
+
+			hook.Save()
+			hook.RefreshShop()
+		end
+
+		hook.GetCardType = function(line)
+			local File = newCharacter:FindFirstChild("Shop")
+			local root = File and File:FindFirstChild("Holder") and File.Holder:FindFirstChild("Pages")
+			if root and root:FindFirstChild("Sword") and line:IsDescendantOf(root.Sword) then
+				return "Sword"
+			end
+
+			if root and root:FindFirstChild("Explosion") and line:IsDescendantOf(root.Explosion) then
+				return "Explosion"
+			end
+		end
+
+		hook.UpdateMultiDelete = function()
+			local radians = 0
+
+			for _, existingPlayer in pairs(hook.Types) do
+				for _, propertyName in pairs(hook.MultiDelete[existingPlayer]) do
+					radians += propertyName
+				end
+			end
+
+			local lineObject = hook.Overlays.MultiDelete
+
+			if lineObject then
+				lineObject.Visible = hook.Status == "active"
+			end
+
+			local File = newCharacter:FindFirstChild("Shop")
+			local textButton = File and File:FindFirstChild("Holder") and File.Holder:FindFirstChild("DeleteItems")
+			textButton = textButton and textButton:FindFirstChild("Title")
+
+			if textButton then
+				textButton.Text = radians > 0 and "Delete Items (" .. radians .. ")" or "Delete Items"
+			end
+		end
+
+		hook.GetDeleteList = function()
+			local File = newCharacter:FindFirstChild("Shop")
+			File = File and File:FindFirstChild("Holder")
+			File = File and File:FindFirstChild("DeleteItems")
+			local targetCharacter = File and File:FindFirstChild("List") and File.List:FindFirstChild("ContentsCanvas")
+			return targetCharacter and targetCharacter:FindFirstChild("ScrollingFrame")
+		end
+
+		hook.SetDeleteCount = function(line, object, descendant)
+			local radians = hook.ShopItems[line][object]
+			local angleRadians = radians and hook.ShopState[radians]
+			if not angleRadians then
+				return
+			end
+			local difference = math.clamp(descendant, 0, #angleRadians.ItemsMatching)
+			hook.MultiDelete[line][object] = difference > 0 and difference or nil
+			hook.SetShopState(radians, { InDeleteMulti = difference, ForceHide = difference > 0 and difference == #angleRadians.ItemsMatching })
+			local query = line .. "\0" .. object
+			local targetPart = hook.MultiDeleteCards[query]
+
+			if difference == 0 then
+				if targetPart then
+					targetPart:Destroy()
+				end
+
+				hook.MultiDeleteCards[query] = nil
+			else
+				local track = hook.GetDeleteList()
+
+				if track then
+					if not targetPart or targetPart.Parent ~= track then
+						local modelTemplate = track:FindFirstChildWhichIsA("UIListLayout")
+						modelTemplate = modelTemplate and modelTemplate:FindFirstChild("Template")
+						local vertexCount = hook.ItemInfo[line][object]
+						if not modelTemplate or not vertexCount then
+							return
+						end
+						targetPart = modelTemplate:Clone()
+						targetPart.Name = line .. "_" .. object
+						targetPart.Visible = true
+						targetPart.Button.Label.Text = vertexCount.DisplayName or vertexCount.Name or object
+						targetPart.Button.Item.Vector.Image = vertexCount.Icon or ""
+						local MATERIAL_PENETRATION_COST = hook.TradeInfo.SmallerSlotColors
+						local capacity = MATERIAL_PENETRATION_COST[vertexCount.Rarity] or MATERIAL_PENETRATION_COST.Default
+						targetPart.Button.Item.Image = capacity.Image
+						targetPart.Button.Item.HoverImage = capacity.HoverImage
+						targetPart.Parent = track
+						hook.MultiDeleteCards[query] = targetPart
+
+						local function handlePlayerRemoving()
+							hook.SetDeleteCount(line, object, (hook.MultiDelete[line][object] or 0) - 1)
+						end
+
+						targetPart.Button.Activated:Connect(handlePlayerRemoving)
+						targetPart.Button.Item.Activated:Connect(handlePlayerRemoving)
+					end
+
+					targetPart.Button.Item.Label.Text = "x" .. difference
+				end
+			end
+
+			hook.UpdateMultiDelete()
+		end
+
+		hook.ClearMultiDelete = function()
+			for _, particle in pairs(hook.Types) do
+				for vertex in pairs(hook.MultiDelete[particle]) do
+					local angleRadians = hook.ShopItems[particle][vertex]
+
+					if angleRadians and not hook.Deleted[particle][vertex] then
+						hook.SetShopState(angleRadians, { InDeleteMulti = 0, ForceHide = false })
+					end
+				end
+			end
+
+			table.clear(hook.MultiDelete.Sword)
+			table.clear(hook.MultiDelete.Explosion)
+
+			for vertex, particle in pairs(hook.MultiDeleteCards) do
+				if particle then
+					particle:Destroy()
+				end
+
+				hook.MultiDeleteCards[vertex] = nil
+			end
+
+			hook.UpdateMultiDelete()
+
+			if hook.Status == "active" then
+				hook.RefreshShop()
+			end
+		end
+
+		hook.ToggleMultiItem = function(line)
+			if not hook.Shop._multiDelete then
+				return
+			end
+			local radians = hook.GetCardType(line)
+			local callbackFunction = line:GetAttribute("Name")
+			local angleRadians = radians and callbackFunction and hook.ShopItems[radians][callbackFunction]
+			if not (angleRadians and hook.ShopState[angleRadians]) or hook.Deleted[radians][callbackFunction] then
+				return
+			end
+			hook.SetDeleteCount(radians, callbackFunction, (hook.MultiDelete[radians][callbackFunction] or 0) + 1)
+		end
+
+		hook.HookMultiCard = function(line)
+			if hook.Status ~= "active" or not line:IsA("GuiButton") or not hook.GetCardType(line) or hook.CardConnections[line] then
+				return
+			end
+
+			hook.CardConnections[line] = line.Activated:Connect(function()
+					hook.ToggleMultiItem(line)
+				end)
+		end
+
+		hook.CloseMultiDelete = function()
+			hook.Shop._multiDelete = nil
+			hook.Shop:_updateMultiDeleteVisbility()
+			hook.Shop:_updateMultiDelete()
+			hook.ClearMultiDelete()
+		end
+
+		hook.ConfirmMultiDelete = function()
+			if not hook.Shop._multiDelete then
+				return
+			end
+			local lines = {}
+			local radians = 0
+
+			for _, existingPlayer in pairs(hook.Types) do
+				for vertex, propertyName in pairs(hook.MultiDelete[existingPlayer]) do
+					radians += propertyName
+					table.insert(lines, { Type = existingPlayer, Name = vertex, Quantity = propertyName })
+				end
+			end
+
+			hook.ConfirmDelete(lines, "x" .. radians .. " items", hook.CloseMultiDelete)
+		end
+
+		hook.HookMultiDelete = function(line)
+			local root = line:FindFirstChild("Pages")
+			local textButton = line:FindFirstChild("DeleteItems")
+			local ServerStorage = textButton and textButton:FindFirstChild("List") and textButton.List:FindFirstChild("Buttons")
+			local File = hook.Shop
+			hook.Originals.CanDelete = File._canDelete
+
+			File._canDelete = function()
+				return false
+			end
+
+			hook.CloseMultiDelete()
+			local result66 = File._updateMultiDelete
+
+			File._updateMultiDelete = function(object)
+				if hook.Status ~= "active" then
+					return result66(object)
+				end
+
+				if not object._multiDelete then
+					hook.ClearMultiDelete()
+					return
+				end
+				hook.UpdateMultiDelete()
+			end
+
+			hook.Originals.UpdateMultiDelete = result66
+			hook.MakeOverlay("MultiDelete", ServerStorage and ServerStorage:FindFirstChild("Delete"), hook.ConfirmMultiDelete)
+
+			if root then
+				for _, particle in root:GetDescendants() do
+					hook.HookMultiCard(particle)
+				end
+
+				hook.Add(root.DescendantAdded:Connect(function(hit)
+						task.defer(hook.HookMultiCard, hit)
+					end))
+			end
+
+			hook.UpdateMultiDelete()
+		end
+
+		hook.HookShop = function()
+			local File = newCharacter:FindFirstChild("Shop")
+			File = File and File:FindFirstChild("Holder")
+			local player5 = File and File:FindFirstChild("InfoBG")
+			if not File or not player5 then
+				return
+			end
+
+			for _, particle in pairs(hook.Types) do
+				local angleRadians = hook.Shop._inventoryPages[particle]
+				local result25 = angleRadians.MarkDirty
+
+				local function handlePlayerRemoving(line)
+					local track = hook.ShopState[line]
+					if not track or not hook.ShopChanges[line] then
+						return
+					end
+
+					for _, modelName in pairs(hook.ShopFields) do
+						local steering = track[modelName[1]]
+
+						if hook.GetShopState(line, modelName[2]) ~= steering then
+							hook.ApplyShopState(line, modelName[2], steering)
+						end
+					end
+
+					if hook.ConsoleItems then
+						hook.SyncConsoleItem(line)
+					end
+				end
+
+				angleRadians.MarkDirty = function(line, object, descendant)
+					if hook.Status == "active" then
+						if line then
+							handlePlayerRemoving(line)
+						else
+							for _, propertyName in pairs(hook.Shop._virtualItems[particle]) do
+								handlePlayerRemoving(propertyName)
+							end
+						end
+					end
+
+					return result25(line, object, descendant)
+				end
+
+				hook.Originals["MarkDirty" .. particle] = result25
+			end
+
+			hook.Add(player5.BuyButton.Activated:Connect(function()
+					local radians, angleRadians = hook.GetSelected()
+
+					if radians == "Sword" then
+						hook.SelectSword(angleRadians)
+					elseif radians == "Explosion" then
+						hook.SelectExplosion(angleRadians)
+					end
+
+					task.defer(hook.RefreshShop)
+				end))
+
+			hook.MakeOverlay("Favorite", File:FindFirstChild("Favorite"), function()
+					local radians, angleRadians = hook.GetSelected()
+
+					if radians and angleRadians then
+						hook.ToggleFavorite(radians, angleRadians)
+						hook.RefreshShop()
+					end
+				end)
+
+			hook.MakeOverlay("Delete", player5:FindFirstChild("Delete"), function()
+					local radians, angleRadians, track = hook.GetSelected()
+
+						if radians and angleRadians and track and hook.ShopState[track] then
+							hook.PromptDelete(radians, angleRadians)
+						end
+
+						return
+				end)
+
+			local partInstance = newCharacter:FindFirstChild("SecretUpgrade")
+
+			if partInstance then
+				hook.MakeOverlay("AwakenOpen", player5:FindFirstChild("SecretUpgrade"), function()
+						local radians, angleRadians = hook.GetSelected()
+
+						if radians == "Sword" then
+							hook.OpenAwaken(angleRadians)
+						end
+					end)
+
+				hook.MakeOverlay("Awaken", partInstance.Main.Upgrade, function()
+						hook.AwakenSword(hook.AwakenName)
+					end)
+
+				hook.Overlays.AwakenOpen.Visible = true
+				hook.Overlays.Awaken.Visible = true
+			end
+
+			local character2 = player5:FindFirstChild("Equips")
+
+			hook.MakeOverlay("Accessory", character2 and character2:FindFirstChild("EquipAccessory"), function()
+					local radians, angleRadians = hook.GetSelected()
+
+						if radians == "Sword" and hook.Sword == angleRadians then
+							hook.SetAccessory(not hook.Accessory)
+						end
+
+						return
+				end)
+
+			hook.MakeOverlay("Finisher", character2 and character2:FindFirstChild("Finisher"), function()
+					local radians, angleRadians = hook.GetSelected()
+
+					if radians == "Sword" then
+						hook.SetFinisher(angleRadians, not hook.Finishers[angleRadians])
+					end
+				end)
+
+			if hook.Shop.itemSelected and hook.Shop.itemSelected.Connect then
+				hook.Add(hook.Shop.itemSelected:Connect(function()
+						task.defer(hook.RefreshShop)
+					end))
+			end
+
+			hook.HookMultiDelete(File)
+		end
+
+		hook.SyncConsoleItem = function(line)
+			local radians = hook.ConsoleItems[line.Type][line.Name]
+			if not radians or hook.ShopItems[line.Type][line.Name] ~= line then
+				return
+			end
+			local angleRadians = hook.ShopState[line]
+			local difference = angleRadians.ForceHide and 0 or #angleRadians.ItemsMatching
+			radians.Data.OwnedCopies:Set(difference)
+			hook.ShopAPI:GetItemBaseOwnedState(line.Type, line.Name):SetTag("UnlockAll", difference > 0)
+			hook.Console:UpdateItem(radians.Data)
+		end
+
+		hook.BindConsole = function(line, object)
+			for _, particle in getconnections(line.Activated) do
+				if particle.Enabled then
+					particle:Disable()
+					table.insert(hook.ConsoleConnections, particle)
+				end
+			end
+
+			hook.Add(line.Activated:Connect(object))
+		end
+
+		hook.HookConsole = function()
+			local result45 = hook.ShopAPI
+			local ok = result45.ActiveVariant
+			if not ok then
+				return
+			end
+			hook.Console = ok
+			hook.ConsoleItems = { Sword = {}, Explosion = {} }
+			hook.ConsoleConnections = {}
+			local result22 = newCharacter.ControllerShop.Main
+
+			for vertex, particle in pairs({
+				SetEquipped = function(line, object, descendant)
+					if not hook.ShopItems[object] then
+						return hook.Originals.APISetEquipped(line, object, descendant)
+					end
+					local accessoryPrototype = hook.InventoryClient:GetItem(object, descendant)
+					accessoryPrototype = accessoryPrototype and accessoryPrototype.Name or descendant
+					if not hook.ShopItems[object][accessoryPrototype] or hook.Deleted[object][accessoryPrototype] then
+						return false
+					end
+
+					if object == "Sword" then
+						hook.SelectSword(accessoryPrototype)
+					else
+						hook.SelectExplosion(accessoryPrototype)
+					end
+
+					return true
+				end,
+				ToggleFavorited = function(line, object)
+					local player7 = object.ItemInfo.ItemType
+					local targetPlayerName = object.ItemInfo.Name
+					if not hook.ShopItems[player7] then
+						return hook.Originals.APIToggleFavorited(line, object)
+					end
+					hook.ToggleFavorite(player7, targetPlayerName)
+					return true
+				end,
+				ToggleSwordAccessory = function()
+					hook.SetAccessory(not hook.Accessory)
+				end,
+				RequestFinisherEquip = function(line, object)
+					hook.SetFinisher(object.Name, not hook.Finishers[object.Name])
+					return true
+				end,
+				ToggleSwordStyle = function()
+					local radians = hook.ItemInfo.Sword[hook.Sword]
+
+					if radians then
+						radians = radians.AnimationStyles[hook.Accessory and "Accessory" or "Base"]
+					end
+
+					if radians and #radians > 0 then
+						localPlayer:SetAttribute("AnimationStyle", radians[(table.find(radians, localPlayer:GetAttribute("AnimationStyle")) or 0) % #radians + 1])
+					end
+				end,
+			}) do
+				hook.Originals["API" .. vertex] = result45[vertex]
+				result45[vertex] = particle
+			end
+
+			local ServerStorage = result22.DeleteItems.List.Buttons
+			local radians = nil
+
+			for _, existingPlayer in getconnections(ServerStorage.Cancel.Activated) do
+				local edgeIterator = existingPlayer.Enabled and existingPlayer.Function
+
+				if edgeIterator then
+					local endTime = replicatedStorage.Controllers.UI.ShopControllerAPI.Variants.Console
+					edgeIterator = getfenv(existingPlayer.Function).script == endTime
+				end
+
+				if edgeIterator then
+					radians = existingPlayer
+					break
+				end
+			end
+
+			hook.ConsoleCancel = radians
+
+			hook.BindConsole(ServerStorage.Delete, function()
+					local lines = {}
+					local angleRadians = 0
+
+					for vertex, propertyName in debug.getupvalue(ok.GetDeletingItemState, 1) do
+						local vertexCount = propertyName:Get()
+						local player7 = vertex.ItemInfo.ItemType
+						local targetPlayerName = vertex.ItemInfo.Name
+
+						if vertexCount > 0 and hook.ShopItems[player7] then
+							angleRadians += vertexCount
+							table.insert(lines, { Type = player7, Name = targetPlayerName, Quantity = vertexCount })
+						end
+					end
+
+					hook.ConfirmDelete(lines, "x" .. angleRadians .. " items", function()
+						if radians then
+							radians:Fire()
+						end
+					end)
+				end)
+
+			hook.BindConsole(result22.Pages.Sword.Right.UpgradeButton, function()
+					local angleRadians, track = hook.GetSelected()
+
+					if angleRadians == "Sword" then
+						hook.OpenAwaken(track)
+					end
+				end)
+
+			hook.BindConsole(newCharacter.SecretUpgrade.Main.Upgrade, function()
+					hook.AwakenSword(hook.AwakenName)
+				end)
+
+			local HOOK_ORIGINAL_RUN = hook.Run
+			local difference = os.clock() + 0.004
+
+			for _, existingPlayer in pairs(hook.Types) do
+				for vertex, propertyName in pairs(hook.ShopItems[existingPlayer]) do
+					local vertexCount = table.clone(propertyName.Item)
+
+					if hook.ShopState[propertyName].Virtual and existingPlayer == "Sword" then
+						local steering = hook.ItemInfo.Sword[vertex]
+						vertexCount.Finisher = steering.HasFinisher or nil
+						vertexCount.Accessory = steering.AccessoryUnlockable or nil
+					end
+
+					local instance3 = result45:GetItemData(existingPlayer, result45:ParseItemKey(existingPlayer, vertexCount))
+					vertexCount.Id = "UnlockAll:" .. existingPlayer .. ":" .. vertex
+					hook.ConsoleItems[existingPlayer][vertex] = { Data = instance3, Item = vertexCount, Favorite = instance3.IsFavorited:Get() }
+					instance3.IsFavorited:Set(hook.Favorites[existingPlayer][vertex] == true)
+					hook.SyncConsoleItem(propertyName)
+
+					if os.clock() >= difference then
+						runService.Heartbeat:Wait()
+						if hook.Run ~= HOOK_ORIGINAL_RUN or hook.Status ~= "active" then
+							return
+						end
+						difference = os.clock() + 0.004
+					end
+				end
+
+				hook.Add(hook.InventoryClient:OnInventoryChange(existingPlayer, function()
+						task.defer(function()
+							if hook.Run ~= HOOK_ORIGINAL_RUN or hook.Status ~= "active" then
+								return
+							end
+
+							for _, propertyName in pairs(hook.ShopItems[existingPlayer]) do
+								hook.SyncConsoleItem(propertyName)
+							end
+						end)
+					end))
+
+				local track = hook[existingPlayer]
+
+				if track then
+					hook.SetEquipped(existingPlayer, track)
+				end
+			end
+		end
+
+		hook.RestoreConsole = function()
+			local endTime = hook.Console
+			if not endTime then
+				return
+			end
+
+			if hook.ConsoleCancel then
+				hook.ConsoleCancel:Fire()
+			end
+
+			for _, particle in pairs({
+				"SetEquipped",
+				"ToggleFavorited",
+				"ToggleSwordAccessory",
+				"RequestFinisherEquip",
+				"ToggleSwordStyle",
+			}) do
+				onInputEnded("API" .. particle, hook.ShopAPI, particle)
+			end
+
+			for _, particle in pairs(hook.ConsoleConnections) do
+				particle:Enable()
+			end
+
+			for vertex, particle in pairs(hook.ConsoleItems) do
+				for neighbor, existingPlayer in pairs(particle) do
+					existingPlayer.Data.OwnedCopies:Set(#hook.InventoryClient:FindItemsWithKey(vertex, existingPlayer.Data.ParsedItemKey))
+					existingPlayer.Data.IsFavorited:Set(existingPlayer.Favorite)
+					hook.ShopAPI:GetItemBaseOwnedState(vertex, neighbor):SetTag("UnlockAll", nil)
+					endTime:UpdateItem(existingPlayer.Data)
+				end
+			end
+
+			hook.Console = nil
+			hook.ConsoleItems = nil
+			hook.ConsoleConnections = nil
+			hook.ConsoleCancel = nil
+		end
+
+		hook.OpenAwaken = function(columnIndex)
+			local radians = hook.AwakenData[columnIndex]
+			if not radians then
+				return
+			end
+			hook.AwakenName = columnIndex
+			local partInstance = newCharacter.SecretUpgrade
+			partInstance:SetAttribute("ToAwaken", nil)
+			local result22 = partInstance.Main
+			result22.template1.vector.Image = radians.Regular.Icon
+			result22.template2.vector.Image = radians.Awakened.Icon
+			result22.template2.customs.c3.Visible = radians.CustomSlash == true
+			result22.Progress.Fill.Size = UDim2.fromScale(1, 1)
+			local result40 = hook.AwakenData.Requirement
+			result22.Progress.Progress.Text = result40 .. "/" .. result40
+			require(replicatedStorage.ClientGameModules.GuiHandler):Open("SecretUpgrade")
+		end
+
+		hook.DestroyOverlays = function()
+			for _, particle in pairs(hook.Overlays) do
+				if particle and particle.Parent then
+					particle:Destroy()
+				end
+			end
+
+			table.clear(hook.Overlays)
+		end
+
+		hook.ConfirmDelete = function(line, object, descendant)
+			local HOOK_ORIGINAL_RUN = hook.Run
+
+			hook.DeletePrompt:PromptConfirmation({
+				PromptType = "Single",
+				Description = "Are you sure you want to delete " .. object .. "? This cannot be undone.",
+			}, function(radius)
+					if not radius or hook.Status ~= "active" or hook.Run ~= HOOK_ORIGINAL_RUN then
+						return
+					end
+
+					for _, particle in pairs(line) do
+						hook.DeleteItem(particle.Type, particle.Name, particle.Quantity)
+					end
+
+					if descendant then
+						descendant()
+					end
+				end)
+		end
+
+		hook.PromptDelete = function(line, object)
+			if not hook.DeletePrompt then
+				return hook.DeleteItem(line, object)
+			end
+			local radians = hook.ItemInfo[line] and hook.ItemInfo[line][object]
+			hook.ConfirmDelete({ { Type = line, Name = object } }, "x1 " .. tostring(radians and (radians.DisplayName or radians.Name) or object))
+		end
+
+		hook.AwakenSword = function(line)
+			local radians = line and hook.AwakenData[line]
+			local angleRadians = line and hook.ShopItems.Sword[line]
+			local track = radians and hook.ShopItems.Sword[radians.Awakened.Value]
+			local vertexCount = angleRadians and hook.ShopState[angleRadians]
+			if hook.Status ~= "active" or not track or not vertexCount or #vertexCount.ItemsMatching == 0 then
+				return
+			end
+			hook.AwakenName = nil
+			local steering = table.clone(vertexCount.ItemsMatching)
+			table.remove(steering)
+
+			hook.SetShopState(angleRadians, {
+				ItemsMatching = steering,
+				Owns = #steering > 0,
+				Section = #steering > 0 and "Owned" or "Unowned",
+				ForceHide = #steering == 0,
+			})
+
+			local contactName = radians.Awakened.Value
+			local major = table.clone(hook.ShopState[track].ItemsMatching)
+			table.insert(major, "UnlockAll:" .. contactName)
+			hook.Deleted.Sword[contactName] = nil
+			hook.SetShopState(track, { ItemsMatching = major, Owns = true, Section = "Owned", ForceHide = false })
+
+			if hook.Sword == line then
+				hook.SelectSword(contactName, false)
+			end
+
+			if hook.Console then
+				hook.Console.PageInfo.Sword.ItemState:Set(hook.ConsoleItems.Sword[contactName].Data)
+			else
+				hook.Shop:Select({ type = "Sword", name = contactName, data = hook.GetSwordData(contactName) })
+			end
+
+			require(replicatedStorage.ClientGameModules.GuiHandler):Open(hook.Console and "ControllerShop" or "Shop")
+			hook.RefreshShop()
+		end
+
+		hook.DeleteItem = function(line, object, descendant)
+			if hook.Status ~= "active" then
+				return
+			end
+
+			if line == "Emote" then
+				local radians = hook.EmoteItems[object]
+				if not radians then
+					return
+				end
+				hook.Deleted.Emote[object] = true
+				hook.SetFavorite("Emote", object, false, false)
+				local sourceIterator = hook.EmoteCaller and hook.EmoteCaller.Replion.Data.Inventory.Emote
+
+				if sourceIterator and sourceIterator[radians.Id] then
+					sourceIterator[radians.Id] = nil
+
+					if hook.EmoteView then
+						hook.EmoteView.TriggerUpdate(radians, "Remove")
+					end
+				end
+
+				for vertex, existingPlayer in pairs(hook.EquippedEmotes) do
+					if existingPlayer == object then
+						hook.EquippedEmotes[vertex] = nil
+					end
+				end
+
+				hook.UpdateEmoteWheel()
+				hook.Save()
+				return
+			end
+
+			local radians = hook.ShopItems[line] and hook.ShopItems[line][object]
+			local angleRadians = radians and hook.ShopState[radians]
+			if not angleRadians then
+				return
+			end
+			local track = table.clone(angleRadians.ItemsMatching)
+			local vertexCount = 1
+			local endIndex = math.min
+			local difference = descendant or 1
+
+			for k = vertexCount, endIndex(difference, #track) do
+				table.remove(track)
+			end
+
+			hook.SetShopState(radians, { ItemsMatching = track, InDeleteMulti = 0 })
+
+			if #track > 0 then
+				hook.SetShopState(radians, { ForceHide = false })
+				hook.RefreshShop()
+				return
+			end
+
+			hook.Deleted[line][object] = true
+			hook.SetFavorite(line, object, false, false)
+			hook.SetShopState(radians, { Owns = false, Section = "Unowned", ForceHide = false })
+
+			if line == "Sword" and hook.Sword == object then
+				hook.RestoreSword(true)
+			elseif line == "Explosion" and hook.Explosion == object then
+				hook.RestoreExplosion(true)
+			else
+				hook.Save()
+			end
+
+			hook.RefreshShop()
+		end
+
+		hook.PatchSwords = function()
+			if hook.SwordsPatched then
+				return
+			end
+			local yString = rawget(hook.Swords, "EquipSwordTo")
+			local radians = yString and getupvalues and getupvalues(yString)
+			if not radians or not setupvalue then
+				return
+			end
+			local angleRadians = nil
+
+			for vertex, propertyName in pairs(radians) do
+				if typeof(propertyName) == "Instance" and propertyName.ClassName == "Players" then
+					angleRadians = vertex
+				elseif type(propertyName) == "table" and type(rawget(propertyName, "cancel")) == "function" and type(rawget(propertyName, "begin")) == "function" then
+					hook.SwordState = propertyName
+				end
+			end
+
+			if not angleRadians and radians[3] == false and radians[4] == true then
+				setupvalue(yString, 3, playersService)
+				angleRadians = 3
+			end
+
+			if angleRadians and type(radians[angleRadians + 1]) == "boolean" then
+				setupvalue(yString, angleRadians + 1, false)
+			end
+
+			hook.SwordsPatched = angleRadians ~= nil
+		end
+
+		hook.GetSwordData = function(line)
+			local radians = hook.SwordData[line]
+			if radians then
+				return radians
+			end
+			local bypassFunction = hook.Swords
+			bypassFunction = bypassFunction and bypassFunction:GetSword(line)
+
+			if not bypassFunction then
+				bypassFunction = replicatedStorage.Shared.ReplicatedInstances:FindFirstChild("Swords")
+				bypassFunction = bypassFunction and bypassFunction:FindFirstChild("GetSword")
+				bypassFunction = bypassFunction and bypassFunction:Invoke(line)
+			end
+
+			if bypassFunction then
+				hook.SwordData[line] = bypassFunction
+			end
+
+			return bypassFunction
+		end
+
+		hook.GetSlash = function(line)
+			local radians = hook.GetSwordData(line)
+			if not radians then
+				return
+			end
+			local result48 = radians.SlashName or "SlashEffect"
+			hook.SwordFX:GetInstance(result48)
+			return result48
+		end
+
+		hook.RemoveSwords = function(line, object)
+			if not line then
+				return
+			end
+
+			for _, particle in line:GetChildren() do
+				if particle:IsA("Model") and particle.Name ~= object and hook.GetSwordData(particle.Name) then
+					particle:Destroy()
+				end
+			end
+		end
+
+		hook.GetBlade = function()
+			if hook.BladeController then
+				return hook.BladeController
+			end
+
+			if not getconnections or not getupvalues then
+				return
+			end
+			local event = replicatedStorage:FindFirstChild("Remotes") and replicatedStorage.Remotes:FindFirstChild("FireSwordInfo")
+			if not event then
+				return
+			end
+
+			for _, particle in getconnections(event.OnClientEvent) do
+				local edgeIterator = particle.Function and getupvalues(particle.Function)
+
+				if type(edgeIterator) == "table" then
+					for _, existingPlayer in pairs(edgeIterator) do
+						if type(existingPlayer) == "table" and type(existingPlayer.SetSword) == "function" then
+							hook.BladeController = existingPlayer
+							return existingPlayer
+						end
+					end
+				end
+			end
+		end
+
+		hook.PatchBlade = function(line)
+			if not line or hook.Originals.SetSword then
+				return
+			end
+			hook.Originals.SetSword = line.SetSword
+
+			line.SetSword = function(object, descendant)
+				if hook.Status == "active" and hook.Sword then
+					descendant = hook.Sword
+				end
+
+				return hook.Originals.SetSword(object, descendant)
+			end
+		end
+
+		hook.ApplySword = function(line)
+			local radians = hook.GetCharacter()
+			if not radians or not line then
+				return
+			end
+			local targetHumanoid = radians:FindFirstChildOfClass("Humanoid") or radians:WaitForChild("Humanoid", 2)
+			if not targetHumanoid or targetHumanoid.Health <= 0 or not radians:FindFirstChild("HumanoidRootPart") then
+				return
+			end
+
+			if hook.Sword and not hook.SavedEquipped.Sword then
+				hook.Originals.EquippedSword = hook.GetRealEquipped("Sword")
+				hook.SavedEquipped.Sword = true
+			end
+
+			hook.PatchSwords()
+			local player22 = hook.SwordState
+
+			if player22 then
+				player22.cancel(radians)
+			end
+
+			if hook.Swords:EquipSwordTo(radians, line) == false then
+				return
+			end
+			hook.Slash = hook.GetSlash(line) or hook.Slash
+
+			if not hook.Accessory then
+				local result54 = radians:FindFirstChild("SwordAccessories")
+
+				if result54 then
+					result54:Destroy()
+				end
+			end
+
+			local angleRadians = hook.GetBlade()
+
+			if angleRadians then
+				hook.PatchBlade(angleRadians)
+				angleRadians:SetSword(line)
+			end
+
+			if not hook.Accessory then
+				task.defer(function()
+						local result54 = radians:FindFirstChild("SwordAccessories")
+
+						if result54 then
+							result54:Destroy()
+						end
+					end)
+			end
+
+			task.defer(hook.RemoveSwords, radians, line)
+		end
+
+		hook.SetEquipped = function(line, object)
+			if not hook.SavedEquipped[line] then
+				hook.Originals["Equipped" .. line] = hook.GetRealEquipped(line)
+				hook.SavedEquipped[line] = true
+			end
+
+			local sortedArray = hook.ConsoleItems and hook.ConsoleItems[line][object]
+			hook.InventoryReplion:_set({ "Equipped", line }, sortedArray and sortedArray.Item or hook.GetOwnedItem(line, object) or { Name = object, Id = "UnlockAll:" .. line .. ":" .. object })
+
+			if hook.Shop and hook.Shop._selectedItem then
+				hook.Shop:Select(hook.Shop._selectedItem, true)
+			end
+		end
+
+		hook.WatchSword = function(line)
+			if not line then
+				return
+			end
+
+			hook.Add(line.DescendantAdded:Connect(function(hit)
+					local player20 = hook.Sword
+					if hook.Status ~= "active" or not player20 then
+						return
+					end
+					local otherPart = hit:FindFirstAncestorOfClass("Model")
+
+					while otherPart and otherPart.Parent ~= line do
+						otherPart = otherPart:FindFirstAncestorOfClass("Model")
+					end
+
+					if not otherPart or not otherPart:GetAttribute("_equippedSword") or otherPart.Name == player20 then
+						return
+					end
+
+					if hit:IsA("BasePart") or hit:IsA("Decal") then
+						hit.Transparency = 1
+					elseif hit:IsA("ParticleEmitter") or hit:IsA("Trail") then
+						hit.Enabled = false
+						hit:Clear()
+					elseif hit:IsA("Beam") or hit:IsA("Fire") or hit:IsA("Smoke") or hit:IsA("Sparkles") or hit:IsA("Light") then
+						hit.Enabled = false
+					end
+				end))
+
+			hook.Add(line:GetAttributeChangedSignal("CurrentlyEquippedSword"):Connect(function()
+					local player20 = hook.Sword
+
+					if hook.Status == "active" and player20 and line:GetAttribute("CurrentlyEquippedSword") ~= player20 then
+						task.defer(hook.ApplySword, player20)
+					end
+				end))
+
+			local targetHumanoid = line:FindFirstChildOfClass("Humanoid") or line:WaitForChild("Humanoid", 2)
+
+			if targetHumanoid then
+				hook.Add(targetHumanoid.HealthChanged:Connect(function(startIndex)
+						local player20 = hook.Sword
+
+						if hook.Status == "active" and startIndex > 0 and player20 then
+							task.defer(hook.ApplySword, player20)
+						end
+					end))
+			end
+		end
+
+		hook.ClearCloneTracks = function(line)
+			line.Data = nil
+
+				for vertex, particle in pairs(line.OriginalTracks) do
+					if line.Animator and line.Animator.Parent then
+						vertex:Play(0, particle.Weight, particle.Speed)
+					end
+				end
+
+				table.clear(line.OriginalTracks)
+
+				for _, particle in pairs(line.Tracks) do
+					particle:Stop(0)
+					particle:Destroy()
+				end
+
+				table.clear(line.Tracks)
+				return
+		end
+
+		hook.PlayCloneTrack = function(line, object)
+			local radians = hook.Clones[line]
+			if not radians or not radians.Data or not object.IsPlaying then
+				return
+			end
+
+			for _, existingPlayer in pairs(radians.Tracks) do
+				if object == existingPlayer then
+					return
+				end
+			end
+
+			local chunk = object.Animation and hook.CloneAnimationTypes[object.Animation.AnimationId]
+			if not chunk then
+				return
+			end
+			local angleRadians = features.Animation.SwordAPI:GetAnimations(line, chunk, radians.Data.AnimationType, radians.Data.SwordType)[1]
+			if not angleRadians or angleRadians.AnimationId == object.Animation.AnimationId then
+				return
+			end
+			local track = radians.Tracks[angleRadians]
+
+			if not track then
+				track = radians.Animator:LoadAnimation(angleRadians)
+				radians.Tracks[angleRadians] = track
+			end
+
+			local originPosition = object.WeightTarget
+
+			if object.Looped then
+				radians.OriginalTracks[object] = { Weight = originPosition, Speed = object.Speed }
+			end
+
+			track.Priority = object.Priority
+			track.Looped = object.Looped
+			track:Play(0, originPosition, object.Speed)
+
+			if track.Length > 0 then
+				track.TimePosition = math.min(object.TimePosition, track.Length)
+			end
+
+			object:Stop(0)
+		end
+
+		hook.UpdateClone = function(line)
+			local radians = hook.Clones[line]
+			if not radians or radians.Thread or hook.Status ~= "active" or not hook.Sword then
+				return
+			end
+			local targetHumanoid = line:FindFirstChildOfClass("Humanoid")
+			local sourcePlayer = targetHumanoid and targetHumanoid:FindFirstChildOfClass("Animator")
+			if not sourcePlayer or not line:FindFirstChild("Torso") or not line:FindFirstChild("Left Arm") or not line:FindFirstChild("Right Arm") then
+				return
+			end
+
+			if radians.Model and radians.Model.Parent == line and radians.Name == hook.Sword and radians.Accessory == hook.Accessory then
+				for _, existingPlayer in line:GetChildren() do
+					if existingPlayer ~= radians.Model and existingPlayer:GetAttribute("_equippedSword") then
+						existingPlayer:Destroy()
+					end
+				end
+
+				return
+			end
+
+			radians.Thread = task.defer(function()
+					local player20 = hook.Sword
+					local right = hook.Accessory
+					hook.ClearCloneTracks(radians)
+					local angleRadians = hook.GetSwordData(player20)
+					local decoded, otherPart = pcall(hook.Swords.ForceEquipSwordTo, hook.Swords, line, player20, nil, right)
+					if hook.Clones[line] ~= radians then
+						return
+					end
+
+					if not decoded or not otherPart or not angleRadians then
+						radians.Thread = nil
+						return
+					end
+					local track = radians
+					local vertexCount = radians
+					radians.Model = otherPart
+					track.Name = player20
+					vertexCount.Accessory = right
+					local steering = radians
+					local major = sourcePlayer
+					radians.Data = angleRadians
+					steering.Animator = major
+
+					if not radians.Connections.Animation then
+						radians.Connections.Animation = sourcePlayer.AnimationPlayed:Connect(function(object)
+							hook.PlayCloneTrack(line, object)
+						end)
+					end
+
+					for _, partTemplate in sourcePlayer:GetPlayingAnimationTracks() do
+						hook.PlayCloneTrack(line, partTemplate)
+					end
+
+					radians.Thread = nil
+					hook.UpdateClone(line)
+				end)
+		end
+
+		hook.ClearClone = function(line, object)
+			local radians = hook.Clones[line]
+			if not radians then
+				return
+			end
+			hook.Clones[line] = nil
+			cleanupResources(radians.Connections)
+			cleanupResources(radians.Thread)
+			hook.ClearCloneTracks(radians)
+
+			if object and radians.Model and line.Parent then
+				local callbackFunction = line:GetAttribute("EquippedSword") or radians.OriginalSword
+
+				if callbackFunction then
+					task.defer(function()
+							if line.Parent and not hook.Clones[line] then
+								hook.Swords:ForceEquipSwordTo(line, callbackFunction, nil, radians.OriginalAccessory)
+							end
+						end)
+				end
+			end
+		end
+
+		hook.WatchClone = function(line)
+			local cell = hook.Status ~= "active"
+			local active
+
+			if cell then
+				active = cell
+			else
+				local targetPlayerName = localPlayer.Name
+				active = line:GetAttribute("EncryptedCloneOwner") ~= targetPlayerName
+			end
+
+			if active or hook.Clones[line] then
+				return
+			end
+
+			if not hook.CloneAnimationTypes then
+				local keys = {}
+
+				for _, particle in replicatedStorage.Shared.SwordAPI.Collection:GetDescendants() do
+					if particle:IsA("Animation") then
+						for _, existingPlayer in pairs({ "Idle", "Parry", "GrabParry", "SuccessParry" }) do
+							if particle:GetAttribute(existingPlayer) then
+								local track = keys[particle.AnimationId]
+								local rowIndex = particle.AnimationId
+								local isArray = track == nil and existingPlayer
+								local bestLabel
+
+								if isArray then
+									bestLabel = isArray
+								else
+									bestLabel = track == existingPlayer and existingPlayer
+								end
+
+								bestLabel = bestLabel or false
+								keys[rowIndex] = bestLabel
+								break
+							end
+						end
+					end
+				end
+
+				hook.CloneAnimationTypes = keys
+			end
+
+			local lines = {
+				Connections = {},
+				Tracks = {},
+				OriginalTracks = {},
+				OriginalSword = line:GetAttribute("EquippedSword"),
+				OriginalAccessory = line:GetAttribute("HasAccessoryEquipped") == true,
+			}
+
+			hook.Clones[line] = lines
+
+			lines.Connections.Loaded = line.DescendantAdded:Connect(function(hit)
+					local result15 = hit:IsA("Animator")
+					local callbackFunction
+
+					if result15 then
+						callbackFunction = result15
+					else
+						local isArray = hit.Parent == line
+
+						if isArray then
+							callbackFunction = not lines.Model or hit:GetAttribute("_equippedSword")
+						else
+							callbackFunction = isArray
+						end
+					end
+
+					if callbackFunction then
+						task.defer(hook.UpdateClone, line)
+					end
+				end)
+
+			hook.UpdateClone(line)
+		end
+
+		hook.WatchEmotes = function(line)
+			local targetHumanoid
+
+			if line then
+				targetHumanoid = line:FindFirstChildOfClass("Humanoid") or line:WaitForChild("Humanoid", 2)
+			else
+				targetHumanoid = line
+			end
+
+			if not targetHumanoid then
+				return
+			end
+
+			hook.Add(targetHumanoid:GetPropertyChangedSignal("MoveDirection"):Connect(function()
+					if targetHumanoid.MoveDirection ~= Vector3.zero and hook.EmoteTrove then
+						hook.StopEmote()
+					end
+				end))
+		end
+
+		hook.SelectSword = function(player21, line)
+			if not player21 or hook.Deleted.Sword[player21] then
+				return
+			end
+			hook.Sword = player21
+			hook.Slash = hook.GetSlash(player21)
+			features.Animation.PreloadSword(player21)
+			hook.SetEquipped("Sword", player21)
+			hook.PatchParrySuccess()
+
+			for _, particle in game:GetService("CollectionService"):GetTagged("EncryptedClone") do
+				hook.WatchClone(particle)
+				hook.UpdateClone(particle)
+			end
+
+			task.defer(function()
+					if hook.Status == "active" and hook.Sword == player21 then
+						hook.ApplySword(player21)
+					end
+				end)
+
+			if line ~= false then
+				hook.Save()
+			end
+		end
+
+		hook.RestoreSword = function(line)
+			local player20 = hook.Defaults.Sword or "Base Sword"
+			hook.Sword = nil
+			hook.Slash = nil
+
+			if hook.SavedEquipped.Sword then
+				hook.InventoryReplion:_set({ "Equipped", "Sword" }, hook.Originals.EquippedSword)
+				hook.Originals.EquippedSword = nil
+				hook.SavedEquipped.Sword = nil
+			end
+
+			hook.ApplySword(player20)
+
+			if line then
+				hook.Save()
+			end
+
+			for vertex in pairs(hook.Clones) do
+				callWithRestoredThreadIdentity(hook.ClearClone, vertex, true)
+			end
+		end
+
+		hook.SelectExplosion = function(vehicleEntity, line)
+			if not vehicleEntity or hook.Deleted.Explosion[vehicleEntity] then
+				return
+			end
+			hook.Explosion = vehicleEntity
+			hook.SetEquipped("Explosion", vehicleEntity)
+			localPlayer:SetAttribute("CurrentlyEquippedExplosion", vehicleEntity)
+			local radians = hook.GetCharacter()
+
+			if radians then
+				radians:SetAttribute("CurrentlyEquippedExplosion", vehicleEntity)
+			end
+
+			if line ~= false then
+				hook.Save()
+			end
+		end
+
+		hook.RestoreExplosion = function(line)
+			local health = hook.Defaults.Explosion or "Explosion Normal"
+			hook.Explosion = nil
+
+			if hook.SavedEquipped.Explosion then
+				hook.InventoryReplion:_set({ "Equipped", "Explosion" }, hook.Originals.EquippedExplosion)
+				hook.Originals.EquippedExplosion = nil
+				hook.SavedEquipped.Explosion = nil
+			end
+
+			localPlayer:SetAttribute("CurrentlyEquippedExplosion", health)
+			local radians = hook.GetCharacter()
+
+			if radians then
+				radians:SetAttribute("CurrentlyEquippedExplosion", health)
+			end
+
+			if line then
+				hook.Save()
+			end
+		end
+
+		hook.PatchExplosion = function()
+			if not hook.VFX or hook.Originals.PlayExplosion then
+				return
+			end
+			hook.Originals.PlayExplosion = hook.VFX.PlayExplosion
+
+			hook.VFX.PlayExplosion = function(line, object, descendant, radius, zCoordinate, alpha, color)
+				if hook.Status == "active" and hook.Explosion and color and alpha == localPlayer.Character then
+					object = hook.Explosion
+				end
+
+				if hook.Status == "active" and color and alpha == localPlayer.Character and hook.Sword and hook.Finishers[hook.Sword] and hook.FinishersController then
+					local explosion = zCoordinate and zCoordinate:FindFirstChild("HumanoidRootPart")
+					local folder = workspace:FindFirstChild("Alive")
+					local queue = folder and folder:GetChildren() or {}
+					local difference = 0
+
+					for _, particle in pairs(queue) do
+						if particle ~= zCoordinate then
+							difference += 1
+						end
+					end
+
+					if explosion and folder and difference <= 1 then
+						hook.FinishersController:PlayFinisher(hook.Sword, alpha, zCoordinate, explosion.CFrame, workspace:GetServerTimeNow())
+					end
+				end
+
+				return hook.Originals.PlayExplosion(line, object, descendant, radius, zCoordinate, alpha, color)
+			end
+		end
+
+		hook.PatchParrySuccess = function()
+			if not hookfunction or not getconnections or not getinfo then
+				return
+			end
+			local bindable = replicatedStorage:FindFirstChild("Remotes")
+			local result5 = globalEnvironment.AllusiveSwordEffects or {}
+			globalEnvironment.AllusiveSwordEffects = result5
+
+			local function handlePlayerRemoving(line, object)
+				if hook.Originals[line] or not object then
+					return false
+				end
+
+				for _, particle in getconnections(object) do
+					if particle.Function and (getinfo(particle.Function).name == "parrySuccessAll" or result5[line] == particle.Function) then
+						result5[line] = particle.Function
+						hook.Originals[line .. "Target"] = particle.Function
+						hook.Originals[line] = hookfunction(particle.Function, function(...)local i={...};if  hook .Status=="active"and  hook .Sword and(tostring(i[4])== localPlayer .Name or type(i[4])=="table"and  hook .Clones[i[4].Character])then local y= hook .Slash;if y then i[1]=y;i[3]= hook .Sword;end;end;return  hook .Originals[ line ](unpack(i));end)
+						return true
+					end
+				end
+
+				return false
+			end
+
+			local remote = bindable and bindable:FindFirstChild("ParrySuccessAll")
+			handlePlayerRemoving("Parry_All_Func", remote and remote.OnClientEvent)
+			bindable = bindable and bindable:FindFirstChild("ParrySuccessClient")
+
+			if bindable then
+				bindable = bindable:IsA("BindableEvent") and bindable.Event or bindable.OnClientEvent
+			end
+
+			handlePlayerRemoving("Parry_Client_Func", bindable)
+		end
+
+		hook.StopEmote = function()
+			if hook.EmoteTrove then
+				hook.EmoteTrove:Destroy()
+				hook.EmoteTrove = nil
+			end
+
+			local model = localPlayer.Character
+
+			if model then
+				model:SetAttribute("Emoting", nil)
+			end
+		end
+
+		hook.PlayEmote = function(line)
+			local radians = hook.EmotesFolder:FindFirstChild(line)
+			local angleRadians = hook.GetCharacter()
+			local targetHumanoid = angleRadians and angleRadians:FindFirstChildOfClass("Humanoid")
+			if not radians or not angleRadians or not targetHumanoid or targetHumanoid.MoveDirection.Magnitude > 0 then
+				return
+			end
+			hook.StopEmote()
+			hook.EmoteTrove = hook.Trove.new()
+			angleRadians:SetAttribute("Emoting", radians:GetAttribute("EmoteName") or radians.Name)
+			hook.EmotesShared:Play(angleRadians, hook.EmoteTrove, radians.Name, true, workspace:GetServerTimeNow(), 1, nil, false)
+		end
+
+		hook.PatchEmotes = function()
+			if hook.Originals.EmotePlay then
+				return
+			end
+			hook.Originals.EmotePlay = hook.EmoteController.Play
+
+			hook.EmoteController.Play = function(line, object, descendant)
+				local cell = hook.Status == "active" and object and hook.EmotesFolder:FindFirstChild(object)
+				if cell and cell.AnimationId ~= "" and cell.AnimationId ~= "rbxassetid://0" then
+					return hook.PlayEmote(object)
+				end
+				return hook.Originals.EmotePlay(line, object, descendant)
+			end
+
+			for _, particle in pairs({ "UpdateHolderEmotes", "UpdateMenuContentEmotes" }) do
+				local angleRadians = particle
+				hook.Originals[angleRadians] = hook.EmoteWheel[angleRadians]
+
+				hook.EmoteWheel[angleRadians] = function(line, ...)
+					local track = hook.Originals[angleRadians]
+					local vertexCount = table.pack(...)
+					vertexCount.n = 2 + vertexCount.n - 1
+					table.move(vertexCount, 1, vertexCount.n, 2, vertexCount)
+					vertexCount[1] = line
+					local steering = track(table.unpack(vertexCount, 1, vertexCount.n))
+
+					if hook.Status == "active" then
+						hook.RefreshEmotes()
+					end
+
+					return steering
+				end
+			end
+		end
+
+		hook.GetEmoteSlot = function()
+			if hook.EmoteWheel.type == "Menu" then
+				return math.clamp(tonumber(hook.EmoteWheel.selected) or 1, 1, 24)
+			end
+			return math.clamp(tonumber(hook.EmoteWheel.selected) or hook.SelectedSlot or 1, 1, 8) + ((tonumber(hook.EmoteWheel.page) or 1) - 1) * 8
+		end
+
+		hook.SetEmoteButton = function(line, object)
+			local radians = hook.EmotesFolder:FindFirstChild(object)
+			if not radians then
+				return
+			end
+			local callbackFunction = radians:GetAttribute("EmoteName") or radians.Name
+			local cost = radians:GetAttribute("Icon") or ""
+			local hitHumanoid = newCharacter:FindFirstChild("EmoteWheel")
+			local result78 = hitHumanoid and hitHumanoid:FindFirstChild("Wheel")
+			hitHumanoid = hitHumanoid and hitHumanoid:FindFirstChild("Menu")
+			local angleRadians = 1
+			local difference = math.floor((line - 1) / 8) + angleRadians
+			result78 = result78 and result78:FindFirstChild("Holder")
+			hitHumanoid = hitHumanoid and hitHumanoid:FindFirstChild("Content")
+			local lines = {}
+			local cell = difference == (tonumber(hook.EmoteWheel.page) or 1) and result78 and result78:FindFirstChild(tostring((line - 1) % 8 + 1))
+			hitHumanoid = hitHumanoid and hitHumanoid:FindFirstChild(tostring(line))
+			lines[1] = cell
+			lines[2] = hitHumanoid
+
+			for _, propertyName in pairs(lines) do
+				if propertyName then
+					propertyName:SetAttribute("EmoteId", object)
+					propertyName:SetAttribute("EmoteName", callbackFunction)
+					local relativePosition = propertyName:FindFirstChild("Vector")
+
+					if relativePosition then
+						relativePosition.Image = cost
+					elseif propertyName:IsA("ImageButton") then
+						propertyName.Image = cost
+					end
+
+					local inputBox = propertyName:FindFirstChild("Title") or propertyName:FindFirstChild("ItemName") or propertyName:FindFirstChild("Text")
+
+					if inputBox and inputBox:IsA("TextLabel") then
+						inputBox.Text = callbackFunction
+					end
+				end
+			end
+		end
+
+		hook.RefreshEmotes = function()
+			for vertex, particle in pairs(hook.EquippedEmotes) do
+				hook.SetEmoteButton(tonumber(vertex) or vertex, particle)
+			end
+		end
+
+		hook.UpdateEmoteWheel = function()
+			local result64 = hook.Originals.UpdateHolderEmotes
+			local result65 = hook.Originals.UpdateMenuContentEmotes
+
+			if result64 then
+				result64(hook.EmoteWheel)
+			else
+				hook.EmoteWheel:UpdateHolderEmotes()
+			end
+
+			if result65 then
+				result65(hook.EmoteWheel)
+			else
+				hook.EmoteWheel:UpdateMenuContentEmotes()
+			end
+
+			hook.EmoteWheel:updateCenterText()
+			hook.RefreshEmotes()
+		end
+
+		hook.ApplyEmote = function(line, object)
+			local index50 = tonumber(line) or hook.GetEmoteSlot()
+			if not object or hook.Deleted.Emote[object] or not hook.EmotesFolder:FindFirstChild(object) then
+				return
+			end
+			hook.SelectedSlot = index50
+			hook.EquippedEmotes[index50] = object
+			hook.UpdateEmoteWheel()
+			hook.Save()
+		end
+
+		hook.GetEmoteScroller = function()
+			if hook.EmoteContainer then
+				return hook.EmoteContainer
+			end
+			local hitHumanoid = newCharacter:FindFirstChild("EmoteWheel")
+			hitHumanoid = hitHumanoid and hitHumanoid:FindFirstChild("List")
+			return hitHumanoid and hitHumanoid:FindFirstChild("Content")
+		end
+
+		hook.LoadEmotes = function()
+			local sourceIterator = hook.InventoryClient:GetInventory().Emote or {}
+			if hook.EmoteCatalogLoaded then
+				return sourceIterator
+			end
+			table.clear(hook.EmoteItems)
+			table.clear(hook.EmoteItemsList)
+			table.clear(hook.EmoteDisplays)
+			table.clear(hook.EmoteItemKeys)
+			local lines = {}
+
+			for _, particle in pairs(sourceIterator) do
+				if not hook.IsUnlockItem(particle) then
+					lines[particle.Name] = true
+				end
+			end
+
+			local radians = 0.001
+			local difference = os.clock() + radians
+
+			for _, existingPlayer in hook.EmotesFolder:GetChildren() do
+				local track = hook.ItemInfo.Emote[existingPlayer.Name]
+
+				if existingPlayer:IsA("Animation") and track then
+					hook.EmoteDisplays[track.DisplayName or track.Name] = existingPlayer.Name
+				end
+
+				if existingPlayer:IsA("Animation") and not lines[existingPlayer.Name] and track and type(track.Icon) == "string" and track.Icon ~= "" and track.Icon ~= "rbxassetid://0" and track.Icon ~= existingPlayer.AnimationId then
+					local sourceTable = { Name = existingPlayer.Name, Id = "UnlockAll:Emote:" .. existingPlayer.Name, CreatedAt = 0 }
+					hook.EmoteItems[existingPlayer.Name] = sourceTable
+					table.insert(hook.EmoteItemsList, sourceTable)
+					local players = { "Id" }
+					local result11 = sourceTable.Id
+					hook.EmoteItemKeys[hook.InventoryShared:ItemToKey("Emote", sourceTable, players)] = result11
+				end
+
+				if difference <= os.clock() then
+					runService.Heartbeat:Wait()
+					difference = os.clock() + 0.001
+				end
+			end
+
+			hook.EmoteCatalogLoaded = true
+			return sourceIterator
+		end
+
+		hook.FillEmoteInventory = function()
+			if hook.EmotesReady or hook.EmoteBuilding or not hook.EmoteView then
+				return
+			end
+			hook.EmoteBuilding = true
+			hook.EmoteBuildToken = hook.EmoteBuildToken + 1
+			local isReady = hook.EmoteBuildToken
+
+			task.spawn(function()
+					local pattern = hook.EmoteItemsList
+					local result2 = hook.EmoteInventory
+					local rightIndex = hook.EmoteBuildIndex
+
+					while rightIndex <= #pattern and hook.EmoteBuildToken == isReady do
+						local difference = os.clock() + 0.001
+
+						while true do
+							local radians = pattern[rightIndex]
+
+							if not result2[radians.Id] and not hook.Deleted.Emote[radians.Name] then
+								result2[radians.Id] = radians
+								hook.EmoteView.TriggerUpdate(radians, "Insert")
+							end
+
+							rightIndex += 1
+							if not (rightIndex > #pattern or os.clock() >= difference) then
+								continue
+							end
+							break
+						end
+
+						hook.EmoteBuildIndex = rightIndex
+
+						if rightIndex <= #pattern then
+							runService.Heartbeat:Wait()
+						end
+					end
+
+					if hook.EmoteBuildToken == isReady then
+						hook.EmoteBuilding = false
+						hook.EmotesReady = rightIndex > #pattern
+					end
+				end)
+		end
+
+		hook.PatchInventory = function(line)
+			if hook.Originals.CreateInventory then
+				return
+			end
+			local sound = hook.EmoteSource
+
+			if not sound or not sound.Parent then
+				sound = newCharacter:FindFirstChild("EmoteWheel")
+				sound = sound and sound:FindFirstChild("List")
+				sound = sound and sound:FindFirstChild("Content")
+				hook.EmoteSource = sound
+			end
+
+			if not sound then
+				return
+			end
+
+			if not hook.EmoteContainer then
+				local lines = {}
+
+				for _, particle in sound:GetDescendants() do
+					if particle:IsA("GuiButton") then
+						lines[particle] = particle.Archivable
+						particle.Archivable = false
+					end
+				end
+
+				hook.EmoteContainer = sound:Clone()
+
+				for vertex, particle in pairs(lines) do
+					vertex.Archivable = particle
+				end
+
+				hook.EmoteContainer.Name = "UnlockAllContent"
+				hook.EmoteContainer.Visible = false
+				hook.EmoteInventory = table.clone(line)
+				local radians = hook.InventoryShared.CreateFakeReplion()
+				radians.Data = { Inventory = { Emote = hook.EmoteInventory } }
+				hook.EmoteCaller = { Replion = radians }
+			end
+
+			hook.Originals.EmoteFindItemsWithKey = hook.InventoryClient.FindItemsWithKey
+			hook.Originals.EmoteGetItem = hook.InventoryClient.GetItem
+
+			hook.InventoryClient.FindItemsWithKey = function(object, descendant, radius, ...)
+				local cell = descendant == "Emote" and hook.EmoteItemKeys[radius]
+				if hook.Status == "active" and cell then
+					return { cell }
+				end
+				local score = hook.Originals.EmoteFindItemsWithKey
+				local radians = table.pack(...)
+				radians.n = 4 + radians.n - 1
+				table.move(radians, 1, radians.n, 4, radians)
+				radians[1] = object
+				radians[2] = descendant
+				radians[3] = radius
+				return score(table.unpack(radians, 1, radians.n))
+			end
+
+			hook.InventoryClient.GetItem = function(object, descendant, radius, ...)
+				local targetName = descendant == "Emote" and tostring(radius):match("^UnlockAll:Emote:(.+)$")
+				if hook.Status == "active" and targetName and hook.EmoteItems[targetName] then
+					return hook.EmoteItems[targetName]
+				end
+				local sortedArray = hook.ConsoleItems and hook.ConsoleItems[descendant]
+				local result26 = sortedArray and tostring(radius):match("^UnlockAll:" .. descendant .. ":(.+)$")
+				if hook.Status == "active" and result26 and sortedArray[result26] then
+					return sortedArray[result26].Item
+				end
+				local str = hook.Originals.EmoteGetItem
+				local radians = table.pack(...)
+				radians.n = 4 + radians.n - 1
+				table.move(radians, 1, radians.n, 4, radians)
+				radians[1] = object
+				radians[2] = descendant
+				radians[3] = radius
+				return str(table.unpack(radians, 1, radians.n))
+			end
+
+			local bar = hook.EmoteContainer
+			bar.Position = sound.Position
+			bar.Size = sound.Size
+			bar.Active = sound.Active
+			bar.Visible = false
+			hook.EmoteContainer.Parent = sound.Parent
+			hook.EmoteOriginal = sound
+			hook.OriginalPosition = sound.Position
+			hook.OriginalSize = sound.Size
+			hook.OriginalActive = sound.Active
+			hook.OriginalVisible = sound.Visible
+			sound.Visible = false
+			sound.Position = UDim2.fromOffset(-100000, -15)
+			sound.Active = false
+			hook.Originals.CreateInventory = hook.InventoryController.CreateInventory
+
+			hook.InventoryController.CreateInventory = function(object, descendant)
+				if hook.Status == "active" and descendant.InventoryType == "Emote" then
+					local radians = table.clone(descendant)
+					radians.Caller = hook.EmoteCaller
+					radians.Container = hook.EmoteContainer
+					radians.WatchOnChange = false
+
+					radians.FindItemsWithKey = function(radius, zCoordinate)
+						local cell = radius == "Emote" and hook.EmoteItemKeys[zCoordinate]
+						if cell then
+							return hook.EmoteInventory[cell] and { cell } or {}
+						end
+						return hook.InventoryShared:FindItemsWithKey(hook.EmoteCaller, radius, zCoordinate)
+					end
+
+					local result30 = radians.OnSlotCreated
+
+					radians.OnSlotCreated = function(radius, zCoordinate, alpha, color, initialCapacity)
+						if result30 then
+							result30(radius, zCoordinate, alpha, color, initialCapacity)
+						end
+
+						if zCoordinate and zCoordinate.Name and color and initialCapacity then
+							if hook.EmoteItems[zCoordinate.Name] and getconnections then
+								for _, existingPlayer in getconnections(color.Activated) do
+									existingPlayer:Disconnect()
+								end
+							end
+
+							initialCapacity:Add(color.Activated:Connect(function()
+									local targetPlayerName = zCoordinate.Name
+									task.defer(hook.ApplyEmote, hook.GetEmoteSlot(), targetPlayerName)
+								end))
+						end
+					end
+
+					hook.EmoteView = hook.Originals.CreateInventory(object, radians)
+					return hook.EmoteView
+				end
+
+				return hook.Originals.CreateInventory(object, descendant)
+			end
+
+			if not hook.EmoteView then
+				local lines = {}
+				local result43 = sound.Parent:FindFirstChild("SearchFrame")
+
+				if result43 and getconnections then
+					lines[result43.Search.MouseButton1Click] = {}
+					lines[result43.SearchBG.SearchInput.FocusLost] = {}
+
+					for vertex, particle in pairs(lines) do
+						for _, existingPlayer in getconnections(vertex) do
+							if existingPlayer.Function then
+								particle[existingPlayer.Function] = true
+							end
+						end
+					end
+				end
+
+				local playerData = hook.InventoryController.CreateSortOptions
+
+				hook.InventoryController.CreateSortOptions = function()
+				end
+
+				hook.EmoteWheel:populateEmoteList()
+				hook.InventoryController.CreateSortOptions = playerData
+
+				for vertex, particle in pairs(lines) do
+					for _, existingPlayer in getconnections(vertex) do
+						if next(particle) and existingPlayer.Function and not particle[existingPlayer.Function] then
+							existingPlayer:Disconnect()
+						end
+					end
+				end
+			end
+
+			bar.Visible = true
+			hook.FillEmoteInventory()
+		end
+
+		hook.RestoreInventory = function(line)
+			hook.EmoteBuildToken = hook.EmoteBuildToken + 1
+			hook.EmoteBuilding = false
+			hook.EmoteBuildIndex = 1
+			hook.EmotesReady = false
+			onInputEnded("CreateInventory", hook.InventoryController)
+			onInputEnded("EmoteFindItemsWithKey", hook.InventoryClient, "FindItemsWithKey")
+			onInputEnded("EmoteGetItem", hook.InventoryClient, "GetItem")
+
+			if hook.EmoteContainer then
+				hook.EmoteContainer.Visible = false
+				hook.EmoteContainer.Parent = nil
+			end
+
+			if hook.EmoteOriginal then
+				hook.EmoteOriginal.Position = hook.OriginalPosition
+				hook.EmoteOriginal.Size = hook.OriginalSize
+				hook.EmoteOriginal.Active = hook.OriginalActive
+				hook.EmoteOriginal.Visible = hook.OriginalVisible
+				hook.EmoteOriginal = nil
+				hook.OriginalPosition = nil
+				hook.OriginalSize = nil
+				hook.OriginalActive = nil
+				hook.OriginalVisible = nil
+			end
+
+			if not line then
+				return
+			end
+			cleanupResources(hook.ButtonConnections)
+			table.clear(hook.ButtonConnections)
+
+			if hook.EmoteView then
+				hook.EmoteView.Destroy()
+				hook.EmoteView = nil
+			end
+
+			if hook.EmoteCaller then
+				hook.EmoteCaller.Replion:Destroy()
+				hook.EmoteCaller = nil
+			end
+
+			if hook.EmoteContainer then
+				hook.EmoteContainer:Destroy()
+				hook.EmoteContainer = nil
+			end
+
+			hook.EmoteSource = nil
+			hook.EmoteInventory = nil
+			hook.EmoteCatalogLoaded = false
+		end
+
+		hook.BindEmoteCard = function(line)
+			local radians = hook.ButtonConnections[line]
+
+			if radians then
+				cleanupResources(radians)
+				hook.ButtonConnections[line] = nil
+			end
+
+			if hook.Status ~= "active" or not line.Parent then
+				return
+			end
+			local timerLabel = line:FindFirstChild("ItemName")
+			local angleRadians = timerLabel and hook.EmoteDisplays[timerLabel.Text]
+			if not angleRadians then
+				return
+			end
+
+			if not hook.EmoteItems[angleRadians] then
+				return
+			end
+			local rope = line:FindFirstChild("Favorite")
+			local cash = line:FindFirstChild("Delete")
+
+			if getconnections and rope then
+				for _, propertyName in getconnections(rope.Activated) do
+					propertyName:Disconnect()
+				end
+			end
+
+			if getconnections and cash then
+				for _, propertyName in getconnections(cash.Activated) do
+					propertyName:Disconnect()
+				end
+			end
+
+			local lines = {}
+
+			if rope then
+				table.insert(lines, rope.Activated:Connect(function()
+						hook.ToggleFavorite("Emote", angleRadians)
+					end))
+			end
+
+			if cash then
+				table.insert(lines, cash.Activated:Connect(function()
+						hook.PromptDelete("Emote", angleRadians)
+					end))
+			end
+
+			hook.ButtonConnections[line] = lines
+		end
+
+		hook.HookEmoteCard = function(line)
+			if hook.Status ~= "active" or not line:IsA("GuiButton") or not line:FindFirstChild("ItemName") or hook.CardConnections[line] then
+				return
+			end
+
+			hook.CardConnections[line] = line.ItemName:GetPropertyChangedSignal("Text"):Connect(function()
+					task.defer(hook.BindEmoteCard, line)
+				end)
+
+			task.defer(hook.BindEmoteCard, line)
+		end
+
+		hook.HookEmotes = function()
+			local radians = hook.GetEmoteScroller()
+			if not radians then
+				return
+			end
+
+			for _, existingPlayer in radians:GetDescendants() do
+				hook.HookEmoteCard(existingPlayer)
+			end
+
+			hook.Add(radians.DescendantAdded:Connect(function(hit)
+					task.defer(hook.HookEmoteCard, hit)
+				end))
+		end
+
+		hook.SaveDefaults = function()
+			local model = localPlayer.Character
+			hook.Defaults.Sword = model and model:GetAttribute("CurrentlyEquippedSword") or localPlayer:GetAttribute("CurrentlyEquippedSword") or "Base Sword"
+			hook.Defaults.Explosion = localPlayer:GetAttribute("CurrentlyEquippedExplosion") or model and model:GetAttribute("CurrentlyEquippedExplosion") or "Explosion Normal"
+			hook.Defaults.Accessory = localPlayer:GetAttribute("ShowSwordAccessory") == true
+		end
+
+		hook.ApplySaved = function()
+			local query = tostring(flags.UnlockAllSword or "")
+			local radians = hook.AwakenBase[query] or query
+			local concatenated = tostring(flags.UnlockAllExplosion or "")
+			local partsIterator = flags.UnlockAllEmotes or {}
+			local right = flags.UnlockAllAccessory == true
+			hook.Accessory = right
+			localPlayer:SetAttribute("ShowSwordAccessory", right)
+			local cell = radians ~= ""
+			local active
+
+			if cell then
+				active = not hook.ShopActive or hook.ShopItems.Sword[radians]
+			else
+				active = cell
+			end
+
+			if active then
+				hook.SelectSword(radians, false)
+			end
+
+			if concatenated ~= "" and (not hook.ShopActive or hook.ShopItems.Explosion[concatenated]) then
+				hook.SelectExplosion(concatenated, false)
+			end
+
+			table.clear(hook.EquippedEmotes)
+			local lines = {}
+
+			for vertex in pairs(partsIterator) do
+				local userId = tonumber(vertex)
+
+				if userId then
+					table.insert(lines, userId)
+				end
+			end
+
+			table.sort(lines)
+			local sourceTable = {}
+			local sourceIterator = hook.InventoryClient:GetInventory().Emote or {}
+
+			for _, existingPlayer in pairs(sourceIterator) do
+				sourceTable[existingPlayer.Name] = true
+			end
+
+			for _, existingPlayer in pairs(lines) do
+				local track = partsIterator[tostring(existingPlayer)] or partsIterator[existingPlayer]
+
+				if track and (sourceTable[track] or hook.EmoteItems[track]) then
+					hook.EquippedEmotes[existingPlayer] = track
+				end
+			end
+
+			table.clear(hook.Finishers)
+			local pointGenerator = flags.UnlockAllFinishers or {}
+
+			for vertex, existingPlayer in pairs(pointGenerator) do
+				if existingPlayer == true then
+					hook.Finishers[vertex] = true
+
+					if hook.DataReplion then
+						local players = { "Finishers", "Equipped", vertex }
+						hook.DefaultFinishers[vertex] = hook.DataReplion:Get(players) == true
+						hook.DataReplion:_set(players, true)
+					end
+				end
+			end
+
+			hook.UpdateEmoteWheel()
+		end
+
+		hook.RestoreEmotes = function()
+			table.clear(hook.EquippedEmotes)
+			hook.StopEmote()
+			hook.EmoteWheel:UpdateHolderEmotes()
+			hook.EmoteWheel:UpdateMenuContentEmotes()
+		end
+
+		hook.Start = function()
+			if hook.Status then
+				return
+			end
+			hook.Status = "starting"
+			local HOOK_ORIGINAL_RUN = hook.Run + 1
+			hook.Run = HOOK_ORIGINAL_RUN
+			hook.Load()
+
+			while flags.UnlockAllEnabled and hook.Run == HOOK_ORIGINAL_RUN and not hook.ShopReady() do
+				runService.Heartbeat:Wait()
+			end
+
+			if not flags.UnlockAllEnabled or hook.Run ~= HOOK_ORIGINAL_RUN then
+				if hook.Run == HOOK_ORIGINAL_RUN then
+					hook.Status = nil
+				end
+
+				return
+			end
+
+			hook.Status = "active"
+
+			for _, particle in pairs(hook.Deleted) do
+				table.clear(particle)
+			end
+
+			table.clear(hook.EquippedEmotes)
+			table.clear(hook.SavedEquipped)
+			table.clear(hook.Finishers)
+			table.clear(hook.DefaultFinishers)
+			hook.Accessory = false
+			hook.Originals.EquippedSword = nil
+			hook.Originals.EquippedExplosion = nil
+			hook.LoadFavorites()
+			hook.SaveDefaults()
+			local radians = hook.LoadEmotes()
+			if hook.Run ~= HOOK_ORIGINAL_RUN or hook.Status ~= "active" then
+				return
+			end
+			hook.PatchInventory(radians)
+			hook.HookEmotes()
+			hook.PatchExplosion()
+			hook.PatchEmotes()
+			hook.PatchParrySuccess()
+			hook.ApplySaved()
+			hook.WatchSword(localPlayer.Character)
+			local Players = game:GetService("CollectionService")
+			hook.Add(Players:GetInstanceAddedSignal("EncryptedClone"):Connect(hook.WatchClone))
+
+			hook.Add(Players:GetInstanceRemovedSignal("EncryptedClone"):Connect(function(line)
+					hook.ClearClone(line, true)
+				end))
+
+			for _, existingPlayer in Players:GetTagged("EncryptedClone") do
+				hook.WatchClone(existingPlayer)
+			end
+
+			hook.WatchEmotes(localPlayer.Character)
+
+			hook.Add(localPlayer:GetAttributeChangedSignal("CurrentlyEquippedSword"):Connect(function()
+					local player20 = hook.Sword
+
+					if player20 and localPlayer:GetAttribute("CurrentlyEquippedSword") ~= player20 then
+						task.defer(hook.ApplySword, player20)
+					end
+				end))
+
+			hook.Add(localPlayer.CharacterAdded:Connect(function(playerInstance)
+					local HookCall = hook.Run
+					features.Animation.Reset()
+					hook.WatchSword(playerInstance)
+					hook.WatchEmotes(playerInstance)
+
+					task.delay(1, function()
+						if hook.Status == "active" and hook.Run == HookCall and localPlayer.Character == playerInstance and hook.Sword then
+							hook.ApplySword(hook.Sword)
+
+							if hook.Explosion then
+								localPlayer:SetAttribute("CurrentlyEquippedExplosion", hook.Explosion)
+								playerInstance:SetAttribute("CurrentlyEquippedExplosion", hook.Explosion)
+							end
+						end
+					end)
+				end))
+
+			if not hook.ActivateShop() then
+				return
+			end
+			hook.ApplyFavorites()
+			hook.HookShop()
+			hook.HookConsole()
+		end
+
+		hook.Stop = function(line)
+			if line then
+				for _, particle in pairs({ "Parry_All_Func", "Parry_Client_Func" }) do
+					local angleRadians = hook.Originals[particle .. "Target"]
+
+					if angleRadians then
+						hookfunction(angleRadians, hook.Originals[particle])
+						hook.Originals[particle .. "Target"] = nil
+						hook.Originals[particle] = nil
+					end
+				end
+			end
+
+			local result53 = hook.Status
+			hook.Status = nil
+			hook.Run = hook.Run + 1
+
+			if result53 ~= "active" then
+				if line then
+					hook.RestoreInventory(true)
+				end
+
+				return
+			end
+
+			onInputEnded("UpdateMultiDelete", hook.Shop, "_updateMultiDelete")
+			onInputEnded("CanDelete", hook.Shop, "_canDelete")
+
+			for _, particle in pairs(hook.Types) do
+				onInputEnded("MarkDirty" .. particle, hook.Shop._inventoryPages[particle], "MarkDirty")
+			end
+
+			hook.CloseMultiDelete()
+			cleanupResources(hook.Connections)
+			table.clear(hook.Connections)
+			cleanupResources(hook.CardConnections)
+			table.clear(hook.CardConnections)
+			hook.RestoreConsole()
+			hook.DestroyOverlays()
+			hook.RestoreInventory(line)
+			hook.RestoreShop()
+			hook.RestoreFavorites()
+			localPlayer:SetAttribute("ShowSwordAccessory", hook.Defaults.Accessory == true)
+
+			for vertex, particle in pairs(hook.DefaultFinishers) do
+				if hook.DataReplion then
+					hook.DataReplion:_set({ "Finishers", "Equipped", vertex }, particle == true)
+				end
+			end
+
+			table.clear(hook.Finishers)
+			table.clear(hook.DefaultFinishers)
+			onInputEnded("PlayExplosion", hook.VFX)
+			onInputEnded("EmotePlay", hook.EmoteController, "Play")
+			onInputEnded("UpdateHolderEmotes", hook.EmoteWheel)
+			onInputEnded("UpdateMenuContentEmotes", hook.EmoteWheel)
+			hook.RestoreSword()
+
+			if hook.Originals.SetSword and hook.BladeController then
+				onInputEnded("SetSword", hook.BladeController)
+			end
+
+			hook.RestoreExplosion()
+			hook.RestoreEmotes()
+			hook.Sword = nil
+			hook.Explosion = nil
+		end
+
+		hook.Toggle = function(player28)
+			flags.UnlockAllEnabled = player28
+
+			if player28 then
+				task.defer(hook.Start)
+			else
+				hook.Stop()
+			end
+		end
+	end
+
+        local inventory = features.UnlockAll
+        local start = inventory.Start
+        inventory.Start = function()
+            if M.Destroyed or not flags.UnlockAllEnabled then return end
+            if not M.Try("Unlock All startup", start) then
+                pcall(inventory.Stop, true)
+                inventory.Status = nil
+                inventory.Run += 1
+            end
+        end
+
+    end
+
+    function M.Load(group)
+        if M.Destroyed then return false end
+        if M.Loaded[group] then return true end
+        if not M.Loaders[group] then return false end
+        if not M.Try(group, M.Loaders[group]) then return false end
+        M.Loaded[group] = true
+        return true
+    end
+    function M.ScheduleUnlock()
+        if M.Destroyed or not M.Ready or M.Pending then return end
+        M.Pending = true
+        task.defer(function()
+            local revision
+            repeat
+                revision = M.Revision
+                if M.Desired or M.Loaded.UnlockAll then
+                    if M.Load("UnlockAll") and not M.Destroyed then
+                        flags.UnlockAllEnabled = M.Desired
+                        M.Try("Unlock All", features.UnlockAll.Toggle, M.Desired)
+                    end
+                end
+            until M.Destroyed or revision == M.Revision
+            M.Pending = false
+        end)
+    end
+    function M.Set(key, value)
+        if M.Destroyed then return end
+        if key == "DeviceSpoofType" then
+            flags[key] = (value == "Mobile" or value == "Console") and value or "PC"
+        elseif key == "UnlockAllEnabled" then
+            M.Desired = value == true
+            flags[key] = M.Desired
+            M.Revision += 1
+            M.ScheduleUnlock()
+        end
+    end
+    function M.Commit()
+        if M.Destroyed then return end
+        M.Ready = true
+        if M.Desired then M.ScheduleUnlock() end
+    end
+    function M.ApplyDevice()
+        if M.Destroyed or M.DeviceApplying then return end
+        M.DeviceApplying = true
+        task.defer(function()
+            if M.Load("Device") and not M.Destroyed then M.Try("Device Spoof", features.DeviceSpoof.Apply) end
+            M.DeviceApplying = false
+        end)
+    end
+    function M.Destroy()
+        if M.Destroyed then return end
+        M.Desired, flags.UnlockAllEnabled = false, false
+        if M.Loaded.UnlockAll then M.Try("Unlock All restore", features.UnlockAll.Stop, true) end
+        M.Destroyed = true
+        local deviceRun = globalEnvironment.AllusiveDeviceSpoofRun
+        if type(deviceRun) == "table" and deviceRun.JobId == game.JobId then
+            if type(deviceRun.Restore) == "function" then pcall(deviceRun.Restore) end
+        end
+        cleanupResources(globalEnvironment.AllusiveDeviceSpoofQueue)
+        globalEnvironment.AllusiveDeviceSpoofQueue = nil
+        M.DevicePayload = nil
+        for thread in pairs(M.Tasks) do cleanupResources(thread) end
+        table.clear(M.Tasks)
+        M.Pending, M.DeviceApplying = false, false
+        if M.CleanupConnection then M.CleanupConnection:Disconnect() end
+    end
+    M.CleanupConnection = u839.Destroying:Connect(M.Destroy)
+end
+
+ 
+ 
+do
+    local M = {
+        Enabled = false, AutoEnabled = false, Destroyed = false, Ready = false, AutoReady = false, Busy = false,
+        LastTick = 0, LastAuto = 0, Count = 0, AutoDistance = 0, Generation = 0,
+        Session = 0, AutoSession = 0, Captured = {}, Hooks = {},
+        TokenCandidates = {}, CandidatesScanned = false, KnownMetatables = {},
+    }
+    u1070.oxy_manual = M
+
+    function M.SessionFor(owner)
+        return owner == "Auto" and M.AutoSession or M.Session
+    end
+    function M.Active(owner, session)
+        local enabled = owner == "Auto" and M.AutoEnabled and not M.Enabled or owner ~= "Auto" and M.Enabled
+        return enabled and not M.Destroyed and M.SessionFor(owner) == session
+    end
+    function M.VisualAllowed()
+        if M.Destroyed then return false end
+         
+        if M.Enabled then return M.Ready and u1070.spam.animation_fix_manual == true end
+        return M.AutoEnabled and M.AutoReady and u1070.spam.animation_fix_auto == true
+    end
+
+    function M.ValidArguments(args)
+        return args.n == 8 and type(args[2]) == "string" and type(args[3]) == "string"
+            and type(args[4]) == "number" and typeof(args[5]) == "CFrame"
+            and type(args[6]) == "table" and type(args[7]) == "table" and type(args[8]) == "boolean"
+    end
+
+    local function writeIndex(mt, index, readOnly)
+        local ok = pcall(function()
+            setreadonly(mt, false)
+            mt.__index = index
+        end)
+         
+        pcall(setreadonly, mt, readOnly)
+        return ok
+    end
+
+    function M.ReleaseCapture()
+        if M.CaptureAddedConnection then M.CaptureAddedConnection:Disconnect(); M.CaptureAddedConnection = nil end
+        for mt, entry in pairs(M.Hooks) do
+            entry.Active = false
+             
+            if mt.__index == entry.Wrapper then
+                writeIndex(mt, entry.Original, entry.ReadOnly)
+            end
+        end
+        table.clear(M.Hooks)
+    end
+
+    function M.HookRemote(remote)
+        if M.Destroyed or not (M.Enabled or M.AutoEnabled) or next(M.Captured) ~= nil then return end
+        if not (remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction")) then return end
+        local ok, mt = pcall(getrawmetatable, remote)
+        if ok and type(mt) == "table" then
+            M.KnownMetatables[mt] = true
+            M.HookMetatable(mt)
+        end
+    end
+    function M.HookMetatable(mt)
+        if M.Hooks[mt] or type(mt.__index) ~= "function" then return end
+        local readOnly = true
+        if type(isreadonly) == "function" then
+            local readOK, value = pcall(isreadonly, mt)
+            if readOK then readOnly = value end
+        end
+        local entry = {Original = mt.__index, ReadOnly = readOnly, Active = true}
+        entry.Wrapper = function(object, key)
+            local method = entry.Original(object, key)
+            if not entry.Active or (key ~= "FireServer" and key ~= "InvokeServer")
+                or type(method) ~= "function" then return method end
+            if not (object:IsA("RemoteEvent") or object:IsA("RemoteFunction")) then return method end
+            return function(self, ...)
+                local args = table.pack(...)
+                if entry.Active and (M.Enabled or M.AutoEnabled) and not M.Destroyed and self == object and M.ValidArguments(args) then
+                    M.Captured[object] = args
+                    M.ReleaseCapture()
+                end
+                return method(self, table.unpack(args, 1, args.n))
+            end
+        end
+        M.Hooks[mt] = entry
+        if not writeIndex(mt, entry.Wrapper, readOnly) then
+            entry.Active = false
+            M.Hooks[mt] = nil
+        end
+    end
+    function M.InstallCapture()
+        if M.Destroyed or not (M.Enabled or M.AutoEnabled) or next(M.Captured) ~= nil then return end
+        if type(getrawmetatable) ~= "function" or type(setreadonly) ~= "function" then return end
+        if next(M.Hooks) ~= nil then return end
+        local now = u817()
+        if M.CaptureRetryAt and now - M.CaptureRetryAt < 1 then return end
+        M.CaptureRetryAt = now
+        if not M.CaptureAddedConnection then
+            M.CaptureAddedConnection = u1057.DescendantAdded:Connect(M.HookRemote)
+        end
+        for mt in pairs(M.KnownMetatables) do M.HookMetatable(mt) end
+        if next(M.Hooks) == nil then
+            for _, remote in ipairs(u1057:GetDescendants()) do M.HookRemote(remote) end
+        end
+    end
+
+    function M.CollectTokenCandidates()
+        if M.CandidatesScanned then return end
+        M.CandidatesScanned = true
+        local getValues = getupvalues or (debug and debug.getupvalues)
+        if type(getValues) ~= "function" then return end
+        local seen = {}
+        local function collect(fn)
+            if type(fn) ~= "function" then return end
+            local ok, values = pcall(getValues, fn)
+            if not ok or type(values) ~= "table" then return end
+            for _, value in pairs(values) do
+                if type(value) == "function" and not seen[value] then
+                    seen[value] = true
+                    table.insert(M.TokenCandidates, value)
+                end
+            end
+        end
+         
+        local controllers = u1057:FindFirstChild("Controllers")
+        if controllers then
+            for _, controller in ipairs(controllers:GetChildren()) do
+                if controller.Name:find("SwordsController", 1, true) == 1 then
+                    local pry = controller:FindFirstChild("PRY")
+                    if pry then
+                        local ok, fn = pcall(require, pry)
+                        if ok then collect(fn) end
+                    end
+                end
+            end
+        end
+         
+        if type(getgc) == "function" and debug and type(debug.info) == "function" then
+            local ok, objects = pcall(getgc, true)
+            if ok and type(objects) == "table" then
+                for _, fn in pairs(objects) do
+                    if type(fn) == "function" then
+                        local sourceOK, source = pcall(debug.info, fn, "s")
+                        if sourceOK and type(source) == "string" and source:find("PRY", 1, true) then collect(fn) end
+                    end
+                end
+            end
+        end
+    end
+
+    function M.Tokenize(seed)
+        M.CollectTokenCandidates()
+        local mask
+        if M.TokenFunction then
+            local ok, value = pcall(M.TokenFunction, seed, "TIME")
+            if ok and type(value) == "string" and #value > 0 then mask = value end
+        end
+        if not mask then
+            M.TokenFunction = nil
+            for _, fn in ipairs(M.TokenCandidates) do
+                local ok, value = pcall(fn, seed, "TIME")
+                if ok and type(value) == "string" and #value > 0 then
+                    M.TokenFunction, mask = fn, value
+                    break
+                end
+            end
+        end
+        if not mask then return nil end
+        local serverTime = tostring(math.floor(u797:GetServerTimeNow() * 100))
+        local bytes = table.create(#serverTime)
+        for i = 1, #serverTime do
+            bytes[i] = string.char(bit32.bxor((serverTime:byte(i) + i) % 256,
+                mask:byte((i - 1) % #mask + 1)))
+        end
+        return table.concat(bytes)
+    end
+
+    function M.RecordSend()
+         
+        if M.Destroyed or M.Count > 7 then return end
+        M.Count += 1
+        u1070.spam.parries = M.Count
+        local generation = M.Generation
+        task.delay(0.5, function()
+            if M.Destroyed or M.Generation ~= generation then return end
+            M.Count = math.max(0, M.Count - 1)
+            u1070.spam.parries = M.Count
+        end)
+    end
+
+    function M.FireRemote(owner, context)
+        owner = owner or "Manual"
+        local session = M.SessionFor(owner)
+        if not M.Active(owner, session) or u1068 or not u797.CurrentCamera then return false end
+        local cf, targets, coordinates = u1070.parry.get_payload(context)
+        if not M.Active(owner, session) then return false end
+        local sent = false
+        for remote, original in pairs(M.Captured) do
+            if not M.Active(owner, session) then return sent end
+            if not remote.Parent then
+                M.Captured[remote] = nil
+            else
+                local token = M.Tokenize(original[2])
+                if not M.Active(owner, session) then return sent end
+                if token then
+                     
+                    local method = remote:IsA("RemoteEvent") and remote.FireServer
+                        or remote:IsA("RemoteFunction") and remote.InvokeServer
+                    local ok = type(method) == "function" and pcall(method, remote, original[1], original[2], token, 0.5, cf, targets, coordinates, false)
+                    if ok then sent = true else M.Captured[remote] = nil end
+                end
+            end
+        end
+        if not M.Active(owner, session) then return sent end
+        if not sent then
+             
+             
+            if next(M.Captured) == nil then M.InstallCapture() end
+            if u1179() and M.Active(owner, session) then
+                sent = pcall(u1178.Fire, u1178, 0.5, cf, targets, coordinates, false)
+            end
+            if not sent then return false end
+        end
+        if sent and M.Active(owner, session) then M.RecordSend() end
+        return sent
+    end
+
+    function M.IsAlive()
+        local character = u1061.Character
+        if not character then return false end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid or humanoid.Health <= 0 or not character:FindFirstChild("HumanoidRootPart") then return false end
+        local alive = u1070.spam.alive_ref
+        if not alive or alive.Parent ~= u797 then
+            alive = u797:FindFirstChild("Alive")
+            u1070.spam.alive_ref = alive
+        end
+        return alive ~= nil and alive:FindFirstChild(u1061.Name) ~= nil
+    end
+
+     
+     
+     
+    local V = {Generation = 0, Interval = 0.12, CancelFraction = 0.35}
+    M.Visual = V
+
+    local function stopOwned(track, destroy)
+        if not track then return end
+        if u1070.state.grab_track == track then u1070.state.grab_track = nil end
+        pcall(function() track:Stop(V.StopFade or 0.05) end)
+        if destroy then pcall(function() track:Destroy() end) end
+    end
+
+    function V.CancelStop()
+        local pending = V.StopTask
+        V.StopTask = nil
+        if pending and type(task.cancel) == "function" then pcall(task.cancel, pending) end
+    end
+    function V.Reset(full)
+        V.CancelStop()
+        V.Generation += 1
+        V.Pending = nil
+        V.LastPulse = nil
+        V.RetryAt = nil
+        stopOwned(V.Track, full)
+        if full then
+            V.Track, V.Asset, V.Character, V.Animator, V.Sword = nil, nil, nil, nil, nil
+        end
+    end
+
+    local function findGrab(folder)
+        if not folder then return nil end
+        local animation = folder:FindFirstChild("GrabParry") or folder:FindFirstChild("Parry") or folder:FindFirstChild("Grab")
+        if animation then return animation end
+        local base = folder:FindFirstChild("Base")
+        return base and (base:FindFirstChild("GrabParry") or base:FindFirstChild("Parry") or base:FindFirstChild("Grab"))
+    end
+
+    function V.ReportError(message)
+        if V.LastError ~= message and type(warn) == "function" then
+            warn("[Allusive Private] Animation Fix: " .. message)
+        end
+        V.LastError = message
+    end
+
+    function V.Resolve(character, sword)
+         
+         
+        local shared = u1057:FindFirstChild("Shared")
+        local apiModule = shared and shared:FindFirstChild("SwordAPI")
+        local data
+        local replicated = shared and shared:FindFirstChild("ReplicatedInstances")
+        local swords = replicated and replicated:FindFirstChild("Swords")
+        local getSword = swords and swords:FindFirstChild("GetSword")
+        if getSword then
+            local ok, result = pcall(function() return getSword:Invoke(sword) end)
+            if ok and type(result) == "table" then data = result end
+        end
+        local animationType, swordType = data and data.AnimationType or "Single", data and data.SwordType or "Single"
+        if apiModule then
+            if V.APIModule ~= apiModule or not V.API then
+                local ok, api = pcall(require, apiModule)
+                if ok and type(api) == "table" then V.API, V.APIModule = api, apiModule end
+            end
+            if V.API and type(V.API.GetAnimations) == "function" then
+                local ok, animations = pcall(function()
+                    return V.API:GetAnimations(character, {"Parry", "GrabParry"}, animationType, swordType)
+                end)
+                if ok and type(animations) == "table" then
+                    for _, asset in ipairs(animations) do
+                        if typeof(asset) == "Instance" and asset:IsA("Animation") then return asset end
+                    end
+                end
+            end
+            local collection = apiModule:FindFirstChild("Collection") or apiModule
+            local asset = findGrab(collection:FindFirstChild(animationType)) or findGrab(collection:FindFirstChild("Default"))
+            if asset and asset:IsA("Animation") then return asset end
+        end
+         
+        local ok, folder = pcall(u1070.animation.get_anim_folder)
+        local asset = ok and folder and (folder:IsA("Animation") and folder or findGrab(folder))
+        if asset and asset:IsA("Animation") then return asset end
+        return nil
+    end
+
+    function V.Prepare()
+        if V.Pending or (V.RetryAt and u817() < V.RetryAt) then return end
+        local generation, animator, character, sword = V.Generation, V.Animator, V.Character, V.Sword
+        local pending = {}
+        V.Pending = pending
+        V.RetryAt = u817() + 1
+         
+        task.defer(function()
+            local track
+            local ok, result = pcall(function()
+                local asset = V.Resolve(character, sword)
+                if generation ~= V.Generation or M.Destroyed or not M.VisualAllowed() then return end
+                if not asset then error("No parry Animation was found for " .. tostring(sword), 0) end
+                track = animator:LoadAnimation(asset)
+                for key, value in pairs(asset:GetAttributes()) do track:SetAttribute(key, value) end
+                track:SetAttribute("GrabParry", true)
+                track.Priority = u824.AnimationPriority.Action4
+                return {
+                    Asset = asset,
+                    PlayFade = asset:GetAttribute("PlayFadeTime") or 0.05,
+                    Weight = asset:GetAttribute("PlayWeight") or 1,
+                    Speed = asset:GetAttribute("PlaySpeed") or 1,
+                    StopFade = asset:GetAttribute("StopFadeTime") or 0.05,
+                }
+            end)
+            if V.Pending == pending then V.Pending = nil end
+            if not ok or not result or generation ~= V.Generation or M.Destroyed or not M.VisualAllowed() then
+                stopOwned(track, true)
+                if generation == V.Generation and not M.Destroyed and M.VisualAllowed() then
+                    V.ReportError(tostring(result or "Could not prepare parry animation"))
+                end
+                return
+            end
+            V.LastError = nil
+            V.Asset, V.Track = result.Asset, track
+            V.PlayFade, V.Weight, V.Speed, V.StopFade = result.PlayFade, result.Weight, result.Speed, result.StopFade
+            V.LastPulse = nil
+        end)
+    end
+
+    function V.Pulse()
+        if M.Destroyed or not M.VisualAllowed() then return end
+        local now = u817()
+        local character = u1061.Character
+        if not character then return end
+        if character:GetAttribute("InOverdriveMech") then
+            if V.Track or V.Pending then V.Reset(true) end
+            return
+        end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+        if not animator then return end
+         
+        local sword = u1070.animation.get_sword_name() or "Base Sword"
+        if V.Character ~= character or V.Animator ~= animator or V.Sword ~= sword then
+            V.Reset(true)
+            V.Character, V.Animator, V.Sword = character, animator, sword
+        end
+        local track = V.Track
+        if V.LastPulse and now - V.LastPulse < V.Interval then
+            if not track then return end
+             
+             
+            if track.IsPlaying then
+                character:SetAttribute("ParryTime", math.max(character:GetAttribute("ParryTime") or 0,
+                    track.Length > 0 and track.Length or 1))
+                return
+            end
+        end
+        V.LastPulse = now
+        if not track then V.Prepare(); return end
+         
+        for _, other in ipairs(animator:GetPlayingAnimationTracks()) do
+            if other:GetAttribute("GrabParry") or other:GetAttribute("Parry") or other:GetAttribute("SuccessParry") then
+                pcall(function() other:Stop(other:GetAttribute("StopFadeTime") or 0.05) end)
+            end
+        end
+        local ok = pcall(function()
+            track.TimePosition = 0
+            track:Play(V.PlayFade, V.Weight, V.Speed)
+            u1070.state.grab_track = track
+            local length = track.Length or 0
+            local parryTime = length > 0 and (length - track.TimePosition) * V.Speed or 1
+            character:SetAttribute("ParryTime", math.max(character:GetAttribute("ParryTime") or 0, parryTime))
+        end)
+        if not ok then
+            stopOwned(track, true)
+            V.Track, V.Asset = nil, nil
+            V.RetryAt = now + 1
+            V.ReportError("Could not play the cached parry animation")
+            return
+        end
+        V.LastError = nil
+        V.CancelStop()
+        V.Generation += 1
+        local generation = V.Generation
+        local length = track.Length or 0
+        local cancelDelay = math.max(0.05, length > 0 and math.min(V.Interval, length * V.CancelFraction) or V.Interval)
+        V.StopTask = task.delay(cancelDelay, function()
+            if M.Destroyed or not M.VisualAllowed() or V.Generation ~= generation or V.Track ~= track then return end
+            V.StopTask = nil
+            pcall(function() track:Stop(V.StopFade) end)
+        end)
+    end
+
+    function M.SetAnimation(owner, enabled)
+        local key = owner == "Auto" and "animation_fix_auto" or "animation_fix_manual"
+        u1070.spam[key] = enabled == true
+        local currentOwner = M.Enabled and "Manual" or M.AutoEnabled and "Auto" or nil
+        if owner == currentOwner then V.Reset(false) end
+    end
+
+    function M.Dispatch(owner, context)
+        if M.Busy or not M.IsAlive() then return false end
+        local session = M.SessionFor(owner)
+        if not M.Active(owner, session) then return false end
+        M.Busy = true
+        local ok, result = pcall(function()
+            local mode = owner == "Auto" and u1070.spam.auto_mode or u1070.spam.manual_mode
+            if V.Mode ~= mode then V.Reset(false); V.Mode = mode end
+            local sent = false
+            if mode == "Keypress" then
+                M.ReleaseCapture()
+                sent = u1070.parry.execute_fast("Keypress") ~= false
+                if sent and M.Active(owner, session) then M.RecordSend() end
+            else
+                sent = M.FireRemote(owner, context)
+                if not sent and M.Active(owner, session) then
+                    sent = u1070.parry.execute_fast("Keypress") ~= false
+                    if sent and M.Active(owner, session) then M.RecordSend() end
+                end
+            end
+            if sent and M.Active(owner, session) and M.VisualAllowed() then V.Pulse() end
+            return sent
+        end)
+        M.Busy = false
+        if M.Active(owner, session) then M.LastError = not ok and tostring(result) or nil end
+        return ok and result
+    end
+
+    function M.Step()
+        if M.Destroyed or not M.Ready or not M.Enabled or M.Busy then return end
+        local now = u817()
+        if now - M.LastTick < 0.001 then return end
+        M.LastTick = now
+        M.Dispatch("Manual")  
+    end
+
+    function M.UpdateSchedulers()
+        local manual = not M.Destroyed and M.Enabled
+        local automatic = not M.Destroyed and M.AutoEnabled and not manual
+        if not manual and u1070.spam.connection_manual then
+            u1070.spam.connection_manual:Disconnect(); u1070.spam.connection_manual = nil
+        end
+        if not automatic and u1070.spam.connection_auto then
+            u1070.spam.connection_auto:Disconnect(); u1070.spam.connection_auto = nil
+        end
+        if manual and not u1070.spam.connection_manual then
+            u1070.spam.connection_manual = u1065:Connect(M.Step)
+        elseif automatic and not u1070.spam.connection_auto then
+            u1070.spam.connection_auto = u1065:Connect(M.StepAutoSpam)
+        end
+    end
+    function M.SetManual(enabled)
+        enabled = enabled == true
+        if M.Destroyed then return end
+        if M.Enabled == enabled then return end  
+        M.AutoEvaluating = nil
+        M.Session += 1
+        M.AutoSession += 1  
+        V.Reset(false)
+        M.Enabled = enabled
+        u1070.spam.manual_enabled = enabled
+        M.UpdateSchedulers()
+        if enabled then
+            M.LastTick = 0
+            M.CaptureRetryAt = nil
+             
+        elseif not M.AutoEnabled then
+            M.ReleaseCapture()
+        end
+    end
+
+     
+    function M.ResetCount()
+        M.AutoEvaluating = nil
+        M.Generation += 1
+        M.Count = 0
+        u1070.spam.parries = 0
+        M.AutoDistance, M.LastAuto = 0, 0
+    end
+    function M.WatchBalls(folder)
+        if M.Destroyed or M.BallsFolder == folder then return end
+        if M.BallRemovedConnection then M.BallRemovedConnection:Disconnect(); M.BallRemovedConnection = nil end
+        M.BallsFolder = folder
+        M.ResetCount()
+        if folder then
+            M.BallRemovedConnection = folder.ChildRemoved:Connect(function()
+                M.ResetCount()
+                M.AutoSession += 1
+            end)
+        end
+    end
+    function M.GetAutoBall()
+        local folder = M.BallsFolder
+        if not folder or folder.Parent ~= u797 or folder.Name ~= "Balls" then
+            folder = u797:FindFirstChild("Balls")
+            M.WatchBalls(folder)
+        end
+        if not folder then return end
+        for _, ball in ipairs(u1070.runtime_cache.Children(folder)) do
+            if ball:GetAttribute("realBall") then
+                local part = ball:IsA("BasePart") and ball or ball.PrimaryPart or ball:FindFirstChild("Corpo") or ball:FindFirstChild("Body")
+                if part then return ball, part end
+            end
+        end
+    end
+    function M.GetAutoOpponent(root, context)
+        local config = u1070.config
+        local lock = u1070.target_player
+        if lock and lock.Ready and lock.Enabled then return lock.Character() end
+        if not lock and config.target_player_enabled and config.target_player_name then
+            local target = u1054:FindFirstChild(config.target_player_name)
+            return target and target.Character
+        end
+        if type(u1070.player.get_closest_to_cursor) == "function" then
+            return u1070.player.get_closest_to_cursor(context)
+        end
+         
+        local folder = u797:FindFirstChild("Alive")
+        local best, distance
+        if folder then
+            for _, character in ipairs(u1070.runtime_cache.Children(folder)) do
+                local part = character.PrimaryPart or character:FindFirstChild("HumanoidRootPart")
+                local humanoid = character:FindFirstChildOfClass("Humanoid")
+                if character ~= u1061.Character and part and (not humanoid or humanoid.Health > 0) then
+                    local current = (root.Position - part.Position).Magnitude
+                    if not distance or current < distance then best, distance = character, current end
+                end
+            end
+        end
+        return best
+    end
+    function M.GetDistanceMultiplier(value)
+        value = tonumber(value) or 0.3
+        if value ~= value then value = 0.3 end
+        return math.clamp(value, 0.3, 3)
+    end
+    function M.SetDistanceMultiplier(value)
+        if M.Destroyed then return end
+        value = M.GetDistanceMultiplier(value)
+        if u1070.spam.distance_multiplier ~= value then
+            u1070.spam.distance_multiplier = value
+            M.AutoDistance, M.AutoDistanceScale = 0, nil
+            M.AutoSession += 1  
+        end
+    end
+    function M.AutoPerform(properties, dot, ballDistance, entityDistance, characterDistance, ping)
+         
+        local speed = properties
+        if type(properties) == "table" then
+            speed, dot = properties.Speed, properties.Dot
+            ballDistance, entityDistance = properties.BallDistance, properties.EntityDistance
+            characterDistance, ping = properties.CharacterDistance, properties.Ping
+        end
+         
+         
+        local multiplier = M.GetDistanceMultiplier(u1070.spam.distance_multiplier)
+        if M.AutoDistanceScale ~= multiplier then
+            M.AutoDistance, M.AutoDistanceScale = 0, multiplier
+        end
+        local baseRadius = ping + math.min(speed / 6, 95)
+        local radius = baseRadius * multiplier
+        if entityDistance > radius or ballDistance > radius or (characterDistance or entityDistance) > radius then
+            return M.AutoDistance or 0
+        end
+        M.AutoDistance = (baseRadius - math.clamp(dot, -1, 0) * (5 - math.min(speed / 5, 5))) * multiplier
+        return M.AutoDistance
+    end
+    function M.StepAutoSpam()
+        if M.Destroyed or not M.AutoReady or not M.AutoEnabled or M.Enabled or M.Busy then return end
+        if M.AutoEvaluating and M.AutoEvaluating.Session == M.AutoSession then return end
+        local now = u817()
+        if now - (M.LastAuto or 0) < 0.001 then return end
+        local threshold = math.clamp(tonumber(u1070.spam.threshold) or 1.5, 1, 5)
+        if M.Count <= threshold then
+            M.AutoDistance, M.AutoDistanceScale = 0, nil
+            return
+        end
+        if not M.IsAlive() then return end
+        local evaluation = {Session = M.AutoSession, At = now}
+        M.AutoEvaluating = evaluation
+        local ok, err = pcall(function()
+            local ball, part = M.GetAutoBall()
+            local zoomies = ball and ball:FindFirstChild("zoomies")
+            if not zoomies then return end
+            local character = u1061.Character
+            local root = character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart"))
+            if not root or character:GetAttribute("Pulsed") then return end
+            local context = {Camera = u797.CurrentCamera or u1062}
+            local opponent = M.GetAutoOpponent(root, context)
+            local opponentRoot = opponent and (opponent.PrimaryPart or opponent:FindFirstChild("HumanoidRootPart"))
+            local humanoid = opponent and opponent:FindFirstChildOfClass("Humanoid")
+            if not opponentRoot or opponent == character or humanoid and humanoid.Health <= 0 then return end
+            local offset = root.Position - part.Position
+            local distance = offset.Magnitude
+            local velocity = part.AssemblyLinearVelocity
+             
+            local speed = typeof(velocity) == "Vector3" and velocity.Magnitude or nil
+            if not speed or speed < 0.001 then
+                velocity = zoomies.VectorVelocity
+                speed = typeof(velocity) == "Vector3" and velocity.Magnitude or nil
+            end
+            if not speed then return end
+            if speed ~= speed or speed == math.huge or distance ~= distance or distance == math.huge then return end
+            local dot = distance > 0.001 and speed > 0.001 and offset:Dot(velocity) / (distance * speed) or 0
+            local enemyDistance = (root.Position - opponentRoot.Position).Magnitude
+            local characterDistance = type(u1061.DistanceFromCharacter) == "function" and u1061:DistanceFromCharacter(opponentRoot.Position) or enemyDistance
+            local radius = M.AutoPerform(speed, dot, distance, enemyDistance, characterDistance,
+                math.clamp((tonumber(u1070.cache.get_ping()) or 50) / 10, 1, 16))
+            local target = u1070.sapphire and u1070.sapphire.Target(ball) or ball:GetAttribute("target")
+            if not target or target == "" or characterDistance > radius or distance > radius then return end
+            if target == u1061.Name and characterDistance > 30 and distance > 30 then return end
+            if M.AutoEvaluating ~= evaluation or not M.Active("Auto", evaluation.Session)
+                or u817() - now > 0.1 or u817() < now then return end
+            if distance <= radius and M.Count > threshold and ball.Parent and M.AutoEnabled and not M.Enabled then
+                M.LastAuto = now
+                M.Dispatch("Auto", context)
+            end
+        end)
+        if M.AutoEvaluating == evaluation then
+            M.AutoEvaluating = nil
+            if not ok then M.LastError = tostring(err) end
+        end
+    end
+    function M.SetAuto(enabled)
+        if M.Destroyed then return end
+        enabled = enabled == true
+        if M.AutoEnabled == enabled then return end
+        M.AutoEvaluating = nil
+        M.AutoSession += 1
+        M.AutoEnabled = enabled
+        u1070.spam.auto_enabled = enabled
+        M.UpdateSchedulers()
+        if not M.Enabled then V.Reset(false) end
+        if enabled then
+            M.LastAuto = 0
+        elseif not M.Enabled then M.ReleaseCapture() end
+    end
+    M.WatchBalls(u797:FindFirstChild("Balls"))
+    M.FolderAddedConnection = u797.ChildAdded:Connect(function(folder)
+        if folder.Name == "Balls" then M.WatchBalls(folder) end
+    end)
+    u1070.spam.auto_start = function() M.SetAuto(true) end
+    u1070.spam.auto_stop = function() M.SetAuto(false) end
+
+    function M.Destroy()
+        if M.Destroyed then return end
+        M.SetAuto(false)
+        M.SetManual(false)
+        V.Reset(true)
+        M.Destroyed = true
+        M.AutoEvaluating = nil
+        M.Generation += 1
+        M.Count = 0
+        u1070.spam.parries = 0
+        table.clear(M.Captured)
+        table.clear(M.TokenCandidates)
+        table.clear(M.KnownMetatables)
+        M.TokenFunction = nil
+        if M.CleanupConnection then M.CleanupConnection:Disconnect() end
+        if M.CharacterConnection then M.CharacterConnection:Disconnect() end
+        if M.BallRemovedConnection then M.BallRemovedConnection:Disconnect() end
+        if M.FolderAddedConnection then M.FolderAddedConnection:Disconnect() end
+    end
+    M.CharacterConnection = u1061.CharacterAdded:Connect(function()
+        V.Reset(true)
+        M.ReleaseCapture()
+        table.clear(M.Captured)
+        M.ResetCount()
+        M.Session += 1
+        M.AutoSession += 1
+        M.LastTick = 0
+        M.CaptureRetryAt = nil
+        M.CandidatesScanned = false
+        M.TokenFunction = nil
+        table.clear(M.TokenCandidates)
+    end)
+    if u839 then M.CleanupConnection = u839.Destroying:Connect(M.Destroy) end
+    u1070.spam.manual_start = function() M.SetManual(true) end
+    u1070.spam.manual_stop = function() M.SetManual(false) end
+end
+
+
+ 
+do
+    local T = {Enabled = false, Ready = false, Destroyed = false, Name = "", KillSwitch = false,
+        HighlightEnabled = false, Highlight = nil, Connections = {}, Removing = setmetatable({}, {__mode = "k"}), Last = 0}
+    u1070.target_player = T
+
+    function T.PlayerList()
+        local list = {}
+        for _, player in ipairs(u1054:GetPlayers()) do
+            if player ~= u1061 and not T.Removing[player] then table.insert(list, player.Name) end
+        end
+        table.sort(list)
+        if #list == 0 then list = {"no players"} end
+        return list
+    end
+    function T.Resolve()
+        if T.Destroyed or T.Name == "" then return nil end
+        local player = u1054:FindFirstChild(T.Name)
+        if player == u1061 or T.Removing[player] then return nil end
+        return player
+    end
+    function T.FindCharacter(folder, player)
+        if not folder or not player then return nil end
+        local character = folder:FindFirstChild(player.Name, true)
+        if not character and type(player.DisplayName) == "string" then character = folder:FindFirstChild(player.DisplayName, true) end
+        if character and character:IsA("Model") then return character end
+        for _, model in ipairs(folder:GetChildren()) do
+            if model:IsA("Model") then
+                local id = model:GetAttribute("UserId") or model:GetAttribute("UserID") or model:GetAttribute("User")
+                local humanoid = model:FindFirstChildOfClass("Humanoid")
+                if id ~= nil and player.UserId ~= nil and tostring(id) == tostring(player.UserId)
+                    or model.Name == player.Name or model.Name == player.DisplayName
+                    or humanoid and humanoid.DisplayName and (humanoid.DisplayName == player.DisplayName or humanoid.DisplayName == player.Name) then
+                    return model
+                end
+            end
+        end
+    end
+    function T.AliveCharacter(player)
+        if not player or player == u1061 or T.Removing[player] then return nil end
+        local folder = u797:FindFirstChild("Alive")
+        local character = player.Character
+        if character and character.Parent then
+            if folder and character.Parent ~= folder then return nil end
+        else
+            character = T.FindCharacter(folder, player)
+        end
+        if not character or not character.Parent then return nil end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid and humanoid.Health <= 0 then return nil end
+        return character
+    end
+    function T.RootOf(character)
+        return character and (character.PrimaryPart or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head"))
+    end
+    function T.Character()
+        if not T.Ready or not T.Enabled or T.Destroyed then return nil end
+        return T.AliveCharacter(T.Resolve())
+    end
+    function T.GetAim(context)
+        if context and context.AimRead then return context.Aim end
+        if context then context.AimRead = true end
+        local character = T.Character()
+        local targetRoot = T.RootOf(character)
+        local mine = u1061.Character
+        local myRoot = mine and (mine.PrimaryPart or mine:FindFirstChild("HumanoidRootPart"))
+        local camera = context and context.Camera or u797.CurrentCamera or u1062
+        if not character or not targetRoot or not myRoot or not camera then return nil end
+        if (myRoot.Position - targetRoot.Position).Magnitude < 0.001 then return nil end
+        local ok, screenPoint = pcall(function() return camera:WorldToScreenPoint(targetRoot.Position) end)
+        if not ok or not screenPoint then return nil end
+        if screenPoint.Z <= 0 then
+            local viewport = camera.ViewportSize
+            screenPoint = Vector3.new(math.clamp(screenPoint.X, 0, viewport.X), math.clamp(screenPoint.Y, 0, viewport.Y), 0)
+        end
+        local aim = {Frame = u819.lookAt(myRoot.Position, targetRoot.Position),
+            Coordinates = {screenPoint.X, screenPoint.Y}, Points = {[character.Name] = screenPoint}}
+        if context then context.Aim = aim end
+        return aim
+    end
+    function T.SyncConfig()
+        u1070.config.target_player_enabled = T.Ready and T.Enabled and not T.Destroyed
+        u1070.config.target_player_name = T.Name ~= "" and T.Name or nil
+    end
+    function T.RefreshHighlight()
+        local character = T.Ready and not T.Destroyed and T.HighlightEnabled and T.AliveCharacter(T.Resolve()) or nil
+        local highlight = T.Highlight
+        if highlight and (not character or highlight.Parent ~= character) then
+            highlight:Destroy(); highlight = nil; T.Highlight = nil
+        end
+        if character and not highlight then
+            highlight = u859.new("Highlight")
+            highlight.Name = "AllusiveTargetPlayerHighlight"
+            highlight.Adornee = character
+            highlight.FillColor = u820.fromRGB(30, 110, 255)
+            highlight.FillTransparency = 0.55
+            highlight.OutlineColor = u820.fromRGB(90, 165, 255)
+            highlight.OutlineTransparency = 0
+            highlight.DepthMode = u824.HighlightDepthMode.AlwaysOnTop
+            highlight.Parent = character
+            T.Highlight = highlight
+        end
+    end
+    function T.NextTarget()
+        local folder = u797:FindFirstChild("Alive")
+        local mine = u1061.Character
+        local myRoot = mine and (mine.PrimaryPart or mine:FindFirstChild("HumanoidRootPart"))
+        local best, bestDistance = nil, math.huge
+        if not folder or not myRoot then return nil end
+        for _, model in ipairs(folder:GetChildren()) do
+            local player = u1054:GetPlayerFromCharacter(model)
+            local character = player and player ~= u1061 and T.AliveCharacter(player)
+            local root = character == model and T.RootOf(model)
+            if root then
+                local distance = (myRoot.Position - root.Position).Magnitude
+                if distance < bestDistance then best, bestDistance = player, distance end
+            end
+        end
+        return best
+    end
+    function T.SyncDropdown()
+        local dropdown = T.Dropdown
+        if not dropdown or type(dropdown.update) ~= "function" then return end
+        local list = T.PlayerList()
+        local display = T.Name ~= "" and T.Name or list[1] == "no players" and "no players" or "No target"
+        T.Syncing = true
+        local ok, err = pcall(function() dropdown:update(display) end)
+        T.Syncing = false
+        if not ok then T.LastError = tostring(err) end
+    end
+    function T.SetTarget(name, notify, fromDropdown)
+        if T.Destroyed or T.Syncing then return end
+        if type(name) == "table" then name = name.Name or name[1] end
+        if type(name) ~= "string" or name == "no players" or name == "No target" or name == u1061.Name then name = "" end
+        local changed = T.Name ~= name
+        T.Name = name
+        T.SyncConfig()
+        if not fromDropdown then T.SyncDropdown() end
+        T.RefreshHighlight()
+        if notify and changed then
+            pcall(u864.SendNotification, {title = "Target Player", text = "Target Player -> " .. name, duration = 3})
+        end
+    end
+    function T.RefreshList()
+        if T.Destroyed then return end
+        local dropdown = T.Dropdown
+        if not dropdown or type(dropdown.set_options) ~= "function" then return end
+        T.Syncing = true
+        local ok, err = pcall(function() dropdown:set_options(T.PlayerList()) end)
+        T.Syncing = false
+        if not ok then T.LastError = tostring(err) end
+         
+         
+        T.SyncDropdown()
+    end
+    function T.SetEnabled(enabled)
+        if T.Destroyed then return end
+        T.Enabled = enabled == true
+        T.SyncConfig()
+        T.RefreshHighlight()
+    end
+    function T.SetKillSwitch(enabled)
+        if not T.Destroyed then T.KillSwitch = enabled == true end
+    end
+    function T.SetHighlight(enabled)
+        if T.Destroyed then return end
+        T.HighlightEnabled = enabled == true
+        T.RefreshHighlight()
+    end
+    function T.Loop()
+        if T.Destroyed or not T.Ready then return end
+        local now = u817()
+        if now - T.Last < 0.25 then return end
+        T.Last = now
+        if not (T.Enabled or T.HighlightEnabled) then
+            if T.Highlight then T.RefreshHighlight() end
+            return
+        end
+        if not T.AliveCharacter(T.Resolve()) and T.KillSwitch then
+            local nextPlayer = T.NextTarget()
+            if nextPlayer then T.SetTarget(nextPlayer.Name, true); return end
+        end
+        T.RefreshHighlight()
+    end
+    function T.Destroy()
+        if T.Destroyed then return end
+        T.Destroyed, T.Enabled, T.HighlightEnabled = true, false, false
+        T.SyncConfig()
+        for _, connection in ipairs(T.Connections) do connection:Disconnect() end
+        table.clear(T.Connections)
+        if T.Highlight then T.Highlight:Destroy(); T.Highlight = nil end
+        T.Dropdown = nil
+        table.clear(T.Removing)
+    end
+    table.insert(T.Connections, u1054.PlayerAdded:Connect(function(player)
+        if T.Destroyed then return end
+        T.Removing[player] = nil
+        T.RefreshList()
+    end))
+    table.insert(T.Connections, u1054.PlayerRemoving:Connect(function(player)
+        if T.Destroyed then return end
+         
+        T.Removing[player] = true
+        T.RefreshList()
+        T.RefreshHighlight()
+    end))
+    table.insert(T.Connections, u1063:Connect(T.Loop))
+    if u839 then table.insert(T.Connections, u839.Destroying:Connect(T.Destroy)) end
+end
+
+ 
+do
+    local O = {Connections = {}, Destroyed = false, Busy = false}
+    u1070.optimization = O
+    local localPlayer = u1061
+    local sapphireBBState = O
+    local features = {UnlockAll = {GetSwordData = function(name)
+        local inventory = u1070.sapphire_misc and u1070.sapphire_misc.Features.UnlockAll
+        return inventory and type(inventory.GetSwordData) == "function" and inventory.GetSwordData(name)
+    end}}
+    O.Features = features
+    local newRoot = workspace:FindFirstChild("Runtime")
+    local playerGui = workspace:FindFirstChild("Balls")
+    local CoreGui = workspace:FindFirstChild("TrainingBalls")
+    local function cleanupResources(connections)
+        for _, connection in pairs(connections) do pcall(function() connection:Disconnect() end) end
+    end
+    local function coroutineFunction(name)
+        local connection = O.Connections[name]
+        O.Connections[name] = nil
+        if connection then pcall(function() connection:Disconnect() end) end
+    end
+    function O.Notify(text)
+        if not O.Destroyed then pcall(u864.SendNotification, {title = "Sapphire • Optimization", text = tostring(text), duration = 5}) end
+    end
+    features.LoadRender = function()
+        local lines = {
+            BallEmit = true,
+            Upgrade = true,
+            Arch2 = true,
+            MaxHook = true,
+            Wave = true,
+            Totem = true,
+            TotemRange = true,
+            InfinityFX = true,
+            maxTransmission = true,
+            transmissionpart = true,
+            Tornado = true,
+            Barrier = true,
+            GUARDIAN_DRAGON = true,
+            DRAGON_POSITIONER = true,
+            SpiritDeflect = true,
+            Vanity = true,
+            dash = true,
+            Summon = true,
+            MaxBlink = true,
+        }
+
+        features.Render = {}
+        local sourceTable = { Spawn = true, Rhythm = true, Leaderboards = true, Map = true, UiClaimer = true }
+
+        local players = {
+            ParticleEmitter = true,
+            Beam = true,
+            Trail = true,
+            Smoke = true,
+            Fire = true,
+            Sparkles = true,
+            PointLight = true,
+            SpotLight = true,
+            SurfaceLight = true,
+        }
+
+        local targetTransparency = NumberSequence.new(1)
+
+        local sorted = {
+            "Workspace.Spawn.Limited",
+            "Workspace.Spawn.ItemDuelsNPC",
+            "Workspace.Spawn.AFK",
+            "Workspace.Spawn.GroupCrate",
+            "Workspace.Spawn.Portal",
+            "Workspace.Spawn.ExplosionCratesSign",
+            "Workspace.Spawn.SwordCratesSign",
+            "Workspace.Spawn.MenuRings",
+            "Workspace.Spawn.Spinnyy",
+            "Workspace.Leaderboards",
+            "Workspace.Rhythm.Runtime.Map.Decoration",
+            "Workspace.Rhythm.Runtime.Map.Visuals",
+            "Workspace.Rhythm.Track",
+        }
+
+        local neighbors = {}
+
+        local function onInputEnded(line)
+            local tree = line.ClassName
+            return tree == "Sound" or tree:find("Audio", 1, true) ~= nil
+        end
+
+        local function handlePlayerRemoving(line)
+            local radians = playerGui ~= nil and line:IsDescendantOf(playerGui)
+            local cell
+
+            if radians then
+                cell = radians
+            else
+                cell = CoreGui ~= nil and line:IsDescendantOf(CoreGui)
+            end
+
+            return cell
+        end
+
+        local function onTouched(line)
+            while line and line.Parent and line.Parent ~= workspace do
+                line = line.Parent
+            end
+
+            return line and sourceTable[line.Name] == true
+        end
+
+        local function heartbeatUpdate(line)
+            local sourceString = line:GetFullName()
+
+            for _, particle in pairs(sorted) do
+                if sourceString == particle or sourceString:sub(1, #particle + 1) == particle .. "." then
+                    return true
+                end
+            end
+
+            return false
+        end
+
+        local function onInputChanged(line)
+            if line:IsA("Model") and features.UnlockAll.GetSwordData(line.Name) then
+                return true
+            end
+            local checkpointFolder = line.Parent
+
+            while checkpointFolder and checkpointFolder ~= workspace and checkpointFolder ~= newRoot do
+                if checkpointFolder:IsA("Model") and features.UnlockAll.GetSwordData(checkpointFolder.Name) then
+                    return true
+                end
+                local radians = string.lower(checkpointFolder.Name)
+                if radians == "sord" or radians == "blade" then
+                    return true
+                end
+                checkpointFolder = checkpointFolder.Parent
+            end
+
+            return false
+        end
+
+        local function vectorLength(line, object)
+            sapphireBBState.RenderCache = sapphireBBState.RenderCache or {}
+            local sample = sapphireBBState.RenderCache[line]
+
+            if not sample then
+                sample = {}
+                sapphireBBState.RenderCache[line] = sample
+            end
+
+            for vertex, particle in pairs(object) do
+                if sample[vertex] == nil then
+                    sample[vertex] = line[vertex]
+                end
+
+                line[vertex] = particle
+            end
+        end
+
+        local function vectorAdd()
+            local generator = sapphireBBState.RenderCache
+            sapphireBBState.RenderCache = nil
+            if not generator then
+                return
+            end
+
+            local function targetFunction(line, object)
+                for vertex, particle in pairs(object) do
+                    line[vertex] = particle
+                end
+            end
+
+            for vertex, particle in pairs(generator) do
+                if vertex.Parent then
+                    targetFunction(vertex, particle)
+                else
+                    pcall(targetFunction, vertex, particle)
+                end
+            end
+        end
+
+        local function targetFunction(line, object, descendant)
+            if onInputEnded(line) then
+                return
+            end
+
+            if line:IsA("Highlight") then
+                return
+            end
+
+            if players[line.ClassName] then
+                if line:IsA("ParticleEmitter") or line:IsA("Beam") or line:IsA("Trail") then
+                    vectorLength(line, { Enabled = false, Transparency = targetTransparency })
+                else
+                    vectorLength(line, { Enabled = false })
+                end
+
+                if line:IsA("ParticleEmitter") then
+                    line:Clear()
+                end
+            elseif line:IsA("Decal") or line:IsA("Texture") then
+                vectorLength(line, { Transparency = 1 })
+            elseif descendant and (line:IsA("SurfaceGui") or line:IsA("BillboardGui")) then
+                vectorLength(line, { Enabled = false })
+            elseif line:IsA("BasePart") then
+                if handlePlayerRemoving(line) then
+                    return
+                end
+
+                if object or (heartbeatUpdate(line) or neighbors[line]) and not onInputChanged(line) then
+                    vectorLength(line, { LocalTransparencyModifier = 1, CanCollide = false, CanTouch = false, CanQuery = false })
+                end
+            end
+        end
+
+        local function cleanup(line)
+            while line and line.Parent and line.Parent ~= newRoot do
+                line = line.Parent
+            end
+
+            return line and line.Parent == newRoot and line
+        end
+
+        local function createNode(line)
+            if not line or not line.Parent then
+                return
+            end
+
+            if newRoot and line:IsDescendantOf(newRoot) then
+                local rootFirst = cleanup(line)
+
+                if rootFirst then
+                    rootFirst = rootFirst.Name:find("PortalFor_") or rootFirst.Name:find("WaypointFor_") or lines[rootFirst.Name]
+                end
+
+                if rootFirst then
+                    return
+                end
+                targetFunction(line, true, false)
+            elseif (line:IsA("SurfaceGui") or line:IsA("BillboardGui")) and onTouched(line) then
+                targetFunction(line, false, true)
+            else
+                targetFunction(line, false)
+            end
+        end
+
+        features.Render.DisableFX = function(eventData)
+            sapphireBBState.NoRender = eventData
+            coroutineFunction("Render Workspace")
+
+            if not eventData then
+                vectorAdd()
+                table.clear(neighbors)
+                return
+            end
+
+            local lastTime = workspace:GetDescendants()
+            table.clear(neighbors)
+
+            for _, particle in pairs(lastTime) do
+                if onInputEnded(particle) then
+                    local points = particle:FindFirstAncestorWhichIsA("BasePart")
+
+                    if points and not handlePlayerRemoving(points) then
+                        neighbors[points] = true
+                    end
+                end
+            end
+
+            for _, particle in pairs(lastTime) do
+                createNode(particle)
+            end
+
+            sapphireBBState.Connections["Render Workspace"] = workspace.DescendantAdded:Connect(function(hit)
+                    if not sapphireBBState.NoRender then
+                        return
+                    end
+
+                    if onInputEnded(hit) then
+                        local points = hit:FindFirstAncestorWhichIsA("BasePart")
+
+                        if points and not handlePlayerRemoving(points) then
+                            neighbors[points] = true
+                            targetFunction(points, false)
+                        end
+
+                        return
+                    end
+
+                    createNode(hit)
+                end)
+        end
+
+        local sample = { BloomEffect = true, BlurEffect = true, DepthOfFieldEffect = true, SunRaysEffect = true }
+
+        local function generateRandomString(line, object, descendant)
+            sapphireBBState.AntiLagCache = sapphireBBState.AntiLagCache or {}
+            local result57 = sapphireBBState.AntiLagCache[line]
+
+            if not result57 then
+                result57 = {}
+                sapphireBBState.AntiLagCache[line] = result57
+            end
+
+            if result57[object] == nil then
+                result57[object] = line[object]
+            end
+
+            line[object] = descendant
+        end
+
+        local function createClass()
+            sapphireBBState.AntiLag = false
+            sapphireBBState.AntiLagRestore = nil
+            cleanupResources(sapphireBBState.AntiLagConnections or {})
+            sapphireBBState.AntiLagConnections = nil
+            local duration = sapphireBBState.AntiLagCache
+            sapphireBBState.AntiLagCache = nil
+            duration = duration or {}
+
+            for vertex, particle in pairs(duration) do
+                pcall(function()
+                        for neighbor, existingPlayer in pairs(particle) do
+                            vertex[neighbor] = existingPlayer
+                        end
+                    end)
+            end
+        end
+
+        local function onHumanoidDied(hit)
+            if not sapphireBBState.AntiLag then
+                return
+            end
+            local tree = hit.ClassName
+
+            if tree == "Atmosphere" then
+                generateRandomString(hit, "Density", 0)
+                generateRandomString(hit, "Haze", 0)
+                generateRandomString(hit, "Glare", 0)
+                return
+            end
+
+            if tree == "Clouds" then
+                generateRandomString(hit, "Enabled", false)
+                return
+            end
+
+            if not sample[tree] then
+                return
+            end
+            local duration = sapphireBBState.AntiLagCache and sapphireBBState.AntiLagCache[hit]
+            if duration and duration.Enabled ~= nil then
+                return
+            end
+            generateRandomString(hit, "Enabled", false)
+
+            sapphireBBState.AntiLagConnections[#sapphireBBState.AntiLagConnections + 1] = hit:GetPropertyChangedSignal("Enabled"):Connect(function()
+                    if sapphireBBState.AntiLag and hit.Enabled then
+                        hit.Enabled = false
+                    end
+                end)
+        end
+
+        features.Render.SetAntiLag = function(line)
+            createClass()
+            if not line then
+                return
+            end
+            sapphireBBState.AntiLag = true
+            sapphireBBState.AntiLagConnections = {}
+            sapphireBBState.AntiLagRestore = createClass
+            local TweenService = game:GetService("Lighting")
+            local Terrain = workspace.Terrain
+            local result20 = Enum.QualityLevel.Level01
+            generateRandomString(settings().Rendering, "QualityLevel", result20)
+            generateRandomString(TweenService, "GlobalShadows", false)
+            generateRandomString(TweenService, "EnvironmentDiffuseScale", 0)
+            generateRandomString(TweenService, "EnvironmentSpecularScale", 0)
+            generateRandomString(Terrain, "WaterWaveSize", 0)
+            generateRandomString(Terrain, "WaterWaveSpeed", 0)
+            generateRandomString(Terrain, "WaterReflectance", 0)
+
+            local function subtractVectors(object)
+                if not object then
+                    return
+                end
+
+                for _, particle in object:GetDescendants() do
+                    onHumanoidDied(particle)
+                end
+
+                sapphireBBState.AntiLagConnections[#sapphireBBState.AntiLagConnections + 1] = object.DescendantAdded:Connect(onHumanoidDied)
+            end
+
+            subtractVectors(TweenService)
+            subtractVectors(Terrain)
+            subtractVectors(workspace.CurrentCamera)
+
+            sapphireBBState.AntiLagConnections[#sapphireBBState.AntiLagConnections + 1] = workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
+                    subtractVectors(workspace.CurrentCamera)
+                end)
+        end
+    end
+
+    features.LoadRender()
+    function O.Preset(line)
+        return {
+                    FFlagGraphicsDisableShadows = "True",
+                    FFlagDebugGraphicsDisableShadows = "True",
+                    FFlagGraphicsDisablePostEffects = "True",
+                    FFlagDisablePostFx = "True",
+                    FFlagDisablePostEffect = "True",
+                    FFlagGraphicsDisableParticles = "True",
+                    FFlagDisableScreenSpaceEffects = "True",
+                    FFlagDebugDisableLightingEffects = "True",
+                    FFlagDisableLightInfluence = "True",
+                    FIntRenderQualityLevel = "1",
+                    FIntQualityLevel = "1",
+                    FFlagGraphicsQualityAutoAdjust = "False",
+                    FIntMockClientLightingTechnologyIxpExperimentMode = "0",
+                    FIntMockClientLightingTechnologyIxpExperimentQualityLevel = "7",
+                    DFIntDebugFRMQualityLevelOverride = "3",
+                    DFFlagTextureQualityOverrideEnabled = "True",
+                    DFIntTextureQualityOverride = "0",
+                    FIntTextureLODOverride = "3",
+                    FIntAvatarTextureLOD = "3",
+                    FIntFRMMinGrassDistance = "0",
+                    FIntFRMMaxGrassDistance = "0",
+                    FIntRenderGrassDetailStrands = "0",
+                    FFlagDebugDisableTerrainDecoration = "True",
+                    FIntAvatarHeadMeshQuality = "0",
+                    FIntAvatarBodyMeshQuality = "0",
+                    FFlagDebugSkipAvatarMaterials = "True",
+                    FFlagEnableAvatarStreaming = "True",
+                    FFlagEnableAvatarLoadingSuppression = "True",
+                    FFlagHumanoidAutoLOD = "True",
+                    FFlagEnableHumanoidLOD = "True",
+                    FFlagDebugForceLowMeshAvatars = "True",
+                    FFlagLowQualityCharacterRendering = "True",
+                    FIntAvatarAccessoryRenderDistance = "0",
+                    FIntAvatarLoadTimeoutMS = "0",
+                    FFlagAvatarRenderingOptimization = "True",
+                    FFlagRenderLocalCharacter = "False",
+                    FFlagForceStreamOutCharacters = "True",
+                    FIntMeshPartDetailLevel = "0",
+                    FFlagDisableSunRays = "True",
+                    FFlagDisableWeather = "True",
+                    FFlagDisableAtmosphere = "True",
+                    FFlagDebugDisableWaterEffects = "True",
+                    FFlagDisableMaterialEffects = "True",
+                    FFlagForceSimpleMaterials = "True",
+                    FFlagSkipDecals = "True",
+                    FFlagDisableCameraShake = "True",
+                    FFlagNewLightAttenuation = "True",
+                    DFFlagDisableFrameRateSmoothing = "True",
+                    FFlagDisableRenderingThrottling = "True",
+                    DFIntPerformanceControlFrameTimeMax = "1",
+                    FFlagForceLowMemoryMode = "True",
+                    FFlagDebugLowMemoryMode = "True",
+                    FIntVideoMemoryLimitMB = "256",
+                    FFlagLowDetailMode = "True",
+                    FFlagUIQualityReductionEnabled = "True",
+                    FFlagSkipQualityReductionInLowMemory = "True",
+                    FIntUIQualityReductionLevel = "3",
+                    FIntRobloxGuiBlurIntensity = "0",
+                    FFlagEnableRegionSelectionOverride = "True",
+                    FFlagDebugUseOnlySpecifiedRegion = "True",
+                    DFIntLargePacketQueueSizeCutoffMB = "1000",
+                    DFIntClientPacketHealthyAllocationPercent = "50",
+                    FIntRakNetResendBufferArrayLength = "128",
+                    DFIntWaitOnUpdateNetworkLoopEndedMS = "100",
+                    DFIntWaitOnRecvFromLoopEndedMS = "100",
+                    DFIntCodecMaxOutgoingFrames = "10000",
+                    DFIntCodecMaxIncomingPackets = "100",
+                    DFIntMaxFrameBufferSize = "4",
+                    DFIntMaxProcessPacketsStepsPerCyclic = "5000",
+                    DFIntMaxProcessPacketsJobScaling = "2139999999",
+                    DFIntConnectionMTUSize = "1396",
+                    DFIntClientPacketMaxDelayMs = "1",
+                    DFIntRakNetLoopMs = "1",
+                    DFIntMaxFramesToSend = "1",
+                    DFIntMaxProcessPacketsStepsAccumulated = "0",
+                    DFIntRakNetResendRttMultiple = "1",
+                    DFIntRakNetClockDriftAdjustmentPerPingMillisecond = "2139999999",
+                    DFIntRaknetBandwidthPingSendEveryXSeconds = "1",
+                    DFIntRaknetBandwidthInfluxHundredthsPercentageV2 = "10000",
+                    FIntInterpolationMaxDelayMSec = "1",
+                    FIntInterpolationAwareTargetTimeLerpHundredth = "100",
+                    DFIntParallelAdaptiveInterpolationBatchCount = "1",
+                    DFIntInterpolationDtLimitForLod = "1",
+                    FFlagDebugDisableTelemetryV2Event = "True",
+                    FFlagDebugDisableTelemetryEphemeralStat = "True",
+                    FFlagDebugDisableTelemetryEventIngest = "True",
+                    FFlagDebugDisableTelemetryV2Stat = "True",
+                    FFlagDebugDisableTelemetryV2Counter = "True",
+                    FFlagDebugDisableTelemetryEphemeralCounter = "True",
+                    FFlagDebugDisableTelemetryPoint = "True",
+                    DFIntClientLightingTechnologyChangedTelemetryHundredthsPercent = "0",
+                    DFIntTrackCountryRegionAPIHundredthsPercent = "10000",
+                    DFIntClientLightingEnvmapPlacementTelemetryHundredthsPercent = "100",
+                    FFlagEnableFastPathRendering = "True",
+                    FFlagEnableMeshLODStreaming = "True",
+                    FFlagMovePrerenderV2 = "True",
+                    FFlagMovePrerender = "true",
+                    FFlagFastGPULightCulling3 = "True",
+                    FFlagRenderForceLowQualityDOF = "True",
+                    FFlagPreferLowQualityParts = "True",
+                    FFlagDebugGraphicsPreferLowQuality = "True",
+                    FIntSimSolverResponsiveness = "2147483647",
+                    DFFlagSimRefactorCollisionGeometry2 = "true",
+                    DFFlagSimOptimizeSetSize = "true",
+                    DFFlagSimSolverOptimizeGeometricStiffness4 = "true",
+                    DFFlagSimHumanoidPhysics = "true",
+                    FIntDebugTextureManagerSkipMips = "0",
+                    FIntNumFramesToCaptureCallStack = "1",
+                    FFlagDebugDisplayFPS = "true",
+                    FFlagDebugSkyGray = "true",
+                    FIntFullscreenTitleBarTriggerDelayMillis = "18000000",
+                    FFlagHandleAltEnterFullscreenManually = "False",
+                    FIntActivatedCountTimerMSMouse = "0",
+                    FIntActivatedCountTimerMSKeyboard = "0",
+                    FIntCLI20390 = "-1",
+                    FLogNetwork = "7",
+                    DFFlagDebugPerfMode = "True",
+                    DFIntParryHitboxSize = "23",
+                    FIntHitboxPredictionBuffer = "40",
+                    DFFlagEnableCustomHitbox = "true",
+                    DFFlagCorrectServerReplicatorStatsIP = "True",
+                    DFIntMaxAverageFrameDelayExceedFactor = "0",
+                    DFIntNumFramesAllowedToBeAboveError = "0",
+                    DFFlagRakNetUnblockSelectOnShutdownByWritingToSocket = "True",
+                    DFFlagGameNetFixReplicationSkipBug = "True",
+                    DFFlagCorrectCachePolicySkipRedirectCache = "True",
+                    DFFlagAnimatorFixReplicationASANError = "True",
+                    DFFlagRakNetFixBwCollapse = "False",
+                    FFlagEnableInGameMenuDurationLogger = "False",
+                    DFFlagRakNetDecoupleRecvAndUpdateLoopShutdown = "True",
+                    FFlagPushFrameTimeToHarmony = "True",
+                    DFFlagRakNetUseSlidingWindow4 = "True",
+                    FFlagAnimatorRetargetSkipAnkleModification = "True",
+                    DFFlagSkipSomePropertiesSkip = "True",
+                    DFFlagSkipReadDiskCacheRedirects = "True",
+                    DFFlagSkipSomeProperties = "True",
+                    DFFlagReplicatorCheckReadTableCollisions = "True",
+                    DFFlagDisableDPIScale = "False",
+                    DFFlagJointIrregularityOptimization = "True",
+                    DFFlagReplicateCreateToPlayer = "True",
+                    DFFlagDebugLargeReplicatorForceFullSend = "True",
+                    FFlagEnableZstdDictionaryForClientSettings = "False",
+                    FFlagOnlyDecrementCompletenessIfReplicating = "True",
+                    FFlagDebugDisableOptimizedBytecode = "False",
+                    DFFlagReplicatorSeparateVarThresholds = "True",
+                    FFlagEnableZstdForClientSettings = "False",
+                    FFlagFasterPreciseTime4 = "True",
+                    FFlagDebugCodegenOptSize = "True",
+                    FFlagQuaternionPoseCorrection = "True",
+                    DFFlagAnimatorAnywhere = "True",
+                    InterpolationAwareTargetTimeLerpHundredth = "100",
+                    MaxAverageFrameDelayExceedFactor = "0",
+                    TargetTimeDelayFacctorTenths = "0",
+                    FIntFontSizePadding = "2",
+                    DFIntCSGLevelOfDetailSwitchingDistance = "0",
+                    DFIntCSGLevelOfDetailSwitchingDistanceL12 = "0",
+                    DFIntCSGLevelOfDetailSwitchingDistanceL34 = "0",
+                    DFIntCSGLevelOfDetailSwitchingDistanceL23 = "0",
+                    DebugDisplayFPS = "True",
+                    FStringNetworkDefaultDNSResolveRegion = line,
+                    FStringForceHttpProxyRegion = line,
+                    FStringForceFastConnectRegion = line,
+                    FStringPreferredClientRegion = line,
+                    FStringMatchmakingRegion = line,
+                    FStringDataStoreRegion = line,
+                    FStringClientTelemetryRegionOverride = line,
+                    FStringForceRegion = line,
+                    FStringOverrideRegion = line,
+                    FStringForceGameServerRegion = line,
+                }
+    end
+     
+    local environment = type(getgenv) == "function" and getgenv() or _G
+    local httpService = game:GetService("HttpService")
+    local regions = {
+        {"US East (Virginia / New Jersey)", "us-east"},
+        {"US Central (Illinois / Texas)", "us-central"},
+        {"US West (California / Washington)", "us-west"},
+        {"US South (Florida / Georgia)", "us-south"},
+        {"Europe West (France / Netherlands / UK)", "eu-west"},
+        {"Europe Central (Germany)", "eu-central"},
+        {"Asia East (Hong Kong / Japan)", "as-east"},
+        {"Southeast Asia (Singapore)", "as-southeast"},
+        {"South Asia (India)", "as-south"},
+        {"Oceania (Australia)", "oceania"},
+        {"South America (Brazil)", "sa-east"}
+    }
+    O.RegionNames, O.RegionCodes = {}, {}
+    for _, region in ipairs(regions) do
+        table.insert(O.RegionNames, region[1]); O.RegionCodes[region[1]] = region[2]
+    end
+    O.Region, O.Custom, O.CustomText = O.RegionNames[1], false, ""
+    function O.Parse(text)
+        text = tostring(text or ""):gsub("^\u{FEFF}", ""):match("^%s*(.-)%s*$")
+        if text == "" then return nil, "Custom FFlags is empty." end
+        local ok, value = pcall(httpService.JSONDecode, httpService, text)
+        if ok and type(value) == "string" then ok, value = pcall(httpService.JSONDecode, httpService, value) end
+        if not ok or type(value) ~= "table" then return nil, "Invalid custom FFlags JSON object." end
+        if next(value) == nil then return nil, "Custom FFlags is empty." end
+        for key, entry in pairs(value) do
+            if type(key) ~= "string" or key == "" or not ({string=true, number=true, boolean=true, table=true})[type(entry)] then
+                return nil, "Custom FFlags must be a JSON object with named flags."
+            end
+        end
+        return value
+    end
+    function O.DefaultFlags()
+        local line = O.RegionCodes[O.Region] or "us-east"
+        return O.Preset(line)
+    end
+    function O.ApplyFlags(restore)
+        if O.Destroyed or O.Busy then return false end
+        if type(setfflag) ~= "function" or type(getfflag) ~= "function" then
+            O.Notify("FFlags requires executor support for getfflag and setfflag."); return false
+        end
+        local queue = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+        if type(queue) ~= "function" then O.Notify("Apply & Rejoin requires teleport queue support."); return false end
+        local values, err
+        if restore then
+            values = environment.SapphireFFlagDefaults
+            if type(values) ~= "table" or next(values) == nil then O.Notify("No saved FFlags to restore."); return false end
+        elseif O.Custom then values, err = O.Parse(O.CustomText)
+        else values = O.DefaultFlags() end
+        if not values then O.Notify(err); return false end
+        O.Busy = true
+        task.spawn(function()
+            local previous, committed = {}, false
+            local ok, failure = pcall(function()
+                local defaults = table.clone(environment.SapphireFFlagDefaults or {})
+                local selected, keys = {}, {}
+                for key in pairs(values) do table.insert(keys, key) end
+                table.sort(keys)
+                for i, key in ipairs(keys) do
+                    if O.Destroyed then break end
+                    local name = restore and key or key:gsub("^D?F[FISL][a-z]*", "")
+                    local readable, original = pcall(getfflag, name)
+                    if readable and original ~= nil then
+                        local value = values[key]
+                        if type(value) == "table" then value = httpService:JSONEncode(value)
+                        elseif type(value) == "boolean" then value = value and "True" or "False"
+                        else value = tostring(value) end
+                        if pcall(setfflag, name, value) then
+                            if previous[name] == nil then previous[name] = original end
+                            selected[name] = value
+                            if defaults[name] == nil then defaults[name] = original end
+                        end
+                    end
+                    if i % (O.Custom and 60 or 10) == 0 then task.wait(O.Custom and 0.01 or 0.07) end
+                end
+                if O.Destroyed then return end
+                if next(selected) == nil then O.Notify("No supported FFlags were applied; no rejoin performed."); return end
+                 
+                local payload = string.format([[local H=game:GetService("HttpService")
+local E=type(getgenv)=="function" and getgenv() or _G
+local V=H:JSONDecode(%q)
+E.SapphireFFlagDefaults=H:JSONDecode(%q)
+E.SapphireFFlagsApplied=%s
+if type(setfflag)=="function" then for K,X in pairs(V) do pcall(setfflag,K,X) end end]],
+                    httpService:JSONEncode(selected), httpService:JSONEncode(restore and {} or defaults), restore and "nil" or "true")
+                local queued, queueError = pcall(queue, payload)
+                if not queued then error("Could not queue flags; changes rolled back: " .. tostring(queueError)) end
+                committed = true
+                environment.SapphireFFlagDefaults = restore and {} or defaults
+                environment.SapphireFFlagsApplied = not restore and true or nil
+                O.Notify(restore and "FFlags restored. Rejoining..." or "FFlags applied. Rejoining...")
+                task.wait(O.Custom and 0.04 or 0.5)
+                if O.Destroyed then return end
+                local teleport = game:GetService("TeleportService")
+                if game.JobId ~= "" then teleport:TeleportToPlaceInstance(game.PlaceId, game.JobId, localPlayer)
+                else teleport:Teleport(game.PlaceId, localPlayer) end
+            end)
+            if not committed then
+                for name, value in pairs(previous) do pcall(setfflag, name, tostring(value)) end
+            end
+            O.Busy = false
+            if not ok then O.Notify("FFlags: " .. tostring(failure)) end
+        end)
+        return true
+    end
+    function O.SetNoRender(enabled)
+        if O.Destroyed then return end
+        newRoot = workspace:FindFirstChild("Runtime")
+        playerGui, CoreGui = workspace:FindFirstChild("Balls"), workspace:FindFirstChild("TrainingBalls")
+        local ok, err = pcall(features.Render.DisableFX, enabled == true)
+        if not ok then
+            pcall(features.Render.DisableFX, false)
+            O.Notify("No Render: " .. tostring(err))
+        end
+    end
+    function O.SetAntiLag(enabled)
+        if O.Destroyed then return end
+        local ok, err = pcall(features.Render.SetAntiLag, enabled == true)
+        if not ok then
+            pcall(features.Render.SetAntiLag, false)
+            O.Notify("Anti-Lag: " .. tostring(err))
+        end
+    end
+    function O.Destroy()
+        if O.Destroyed then return end
+        O.Destroyed = true
+        pcall(features.Render.DisableFX, false)
+        pcall(features.Render.SetAntiLag, false)
+        cleanupResources(O.Connections)
+        table.clear(O.Connections)
+    end
+    if u839 then O.Connections.Cleanup = u839.Destroying:Connect(O.Destroy) end
+end
+ 
+
 u1070.animation.init()
 u1070.avatar_changer.save_original()
 __S[5] = __S[84]:create_tab("Combat", "sword")
 __S[6] = __S[84]:create_tab("Detections", "shield")
 __S[7] = __S[84]:create_tab("Visuals", "eye")
 __S[8] = __S[84]:create_tab("Player", "user")
-__S[9] = __S[84]:create_tab("Sword", "package")
-__S[10] = __S[84]:create_tab("Avatar", "users")
 __S[11] = __S[84]:create_tab("Blatant", "skull")
 __S[12] = __S[84]:create_tab("Misc", "settings")
+
+ 
+do
+    local tab = __S[84]:create_tab("Optimization", "rbxassetid://10709813383")
+    local O = u1070.optimization
+    local saved = u864._config._flags
+    local function renderCard(title, description, flag, setter)
+        local initial, building = saved[flag], true
+        local card = tab:create_module({
+            title = title, description = description, section = "left", flag = flag,
+            callback = function(enabled)
+                if building and initial == false then enabled = false end
+                setter(enabled)
+            end
+        })
+        if initial == false then card:change_state(false) end
+        building = false
+        return card
+    end
+    renderCard("No Render", "disables visual effects and selected map decorations while preserving balls, sounds and ability indicators",
+        "optimization_no_render", O.SetNoRender)
+    renderCard("Anti-Lag", "reduces lighting quality, shadows, water effects and post-processing; restores previous values when disabled",
+        "optimization_anti_lag", O.SetAntiLag)
+    local panel = tab:create_module({
+        title = "FFlags", description = "applies client flags supported by your executor; region hints do not guarantee server location",
+        section = "right", flag = "optimization_fflags_panel", callback = function() end
+    })
+    panel:create_checkbox({
+        title = "Custom FFlags", flag = "optimization_custom_fflags",
+        callback = function(enabled) O.Custom = enabled == true end
+    })
+    panel:create_dropdown({
+        title = "Region", flag = "optimization_fflags_region", options = O.RegionNames,
+        maximum_options = 5, multi_dropdown = false,
+        callback = function(region) O.Region = O.RegionCodes[region] and region or O.RegionNames[1] end
+    })
+    panel:create_textbox({
+        title = "Custom FFlags JSON", flag = "optimization_fflags_json", placeholder = '{"FFlagExample":"True"}',
+        callback = function(text) O.CustomText = text end
+    })
+    panel:create_feature({
+        title = "Apply & Rejoin", flag = "optimization_fflags_apply", momentary = true,
+        button_callback = function() O.ApplyFlags(false) end
+    })
+    panel:create_feature({
+        title = "Restore & Rejoin", flag = "optimization_fflags_restore", momentary = true,
+        button_callback = function() O.ApplyFlags(true) end
+    })
+    panel:create_paragraph({title = "FFlags Support", customScale = 90,
+        text = "Requires getfflag, setfflag and teleport queue support. Unsupported flags are skipped. Apply rejoins this server; run Sapphire again afterward. Restore uses the original values saved before Apply."})
+end
+
+ 
+do
+    local detectionsTab, miscTab = __S[6], __S[12]
+detectionsTab:create_module({
+    title = "Staff Detection",
+    description = "identifies staff by their official group roles",
+    section = "left", flag = "staff_detection",
+    callback = function(enabled) u1070.sapphire.Set("StaffDetection", enabled) end
+}):create_dropdown({
+    title = "Detection Mode", flag = "staff_detection_mode",
+    options = {"Notify", "Kick"}, maximum_options = 2, multi_dropdown = false,
+    callback = function(mode)
+        u1070.staff_detection.mode = mode
+        u1070.sapphire.Set("StaffDetectionMode", mode == "Kick" and "kick" or "warn")
+    end
+})
+
+ 
+do
+    local M = u1070.sapphire_misc
+    local tab, saved = miscTab, u864._config._flags
+    local initial = saved.sapphire_misc_unlockallenabled
+    local initializing = true
+    local unlock = tab:create_module({
+        title = "Unlock All (Client)",
+        description = "unlocks client-side inventory previews for swords, explosions, emotes and finishers; does not grant server ownership",
+        section = "right", flag = "sapphire_misc_unlockallenabled", notify = true,
+        callback = function(enabled)
+            if initializing and initial == false then enabled = false end
+            M.Set("UnlockAllEnabled", enabled)
+        end
+    })
+    if initial == false then unlock:change_state(false) end
+    initializing = false
+    local device = tab:create_module({
+        title = "Device Spoof",
+        description = "changes the device shown on your player profile after rejoining",
+        section = "left", flag = "sapphire_misc_device_panel", callback = function() end
+    })
+    local env = type(getgenv) == "function" and getgenv() or _G
+    local applied = env.AllusiveDeviceSpoofApplied
+    local name = type(applied) == "table" and applied.JobId == game.JobId and applied.Device or "PC"
+    if name == "Phone" or name == "Tablet" then name = "Mobile" end
+    if name ~= "Mobile" and name ~= "Console" then name = "PC" end
+     
+    saved.sapphire_misc_devicespooftype = name
+    device:create_dropdown({
+        title = "Device", flag = "sapphire_misc_devicespooftype", options = {"PC", "Mobile", "Console"},
+        maximum_options = 3, multi_dropdown = false,
+        callback = function(value) M.Set("DeviceSpoofType", value) end
+    })
+    device:create_feature({
+        title = "Apply & Rejoin", flag = "sapphire_misc_device_apply", momentary = true,
+        button_callback = function() M.ApplyDevice() end
+    })
+    device:create_paragraph({title = "Apply", text = "Apply rejoins this server. Run Allusive again afterward. Requires teleport queue support."})
+    M.Commit()
+end
+
+end
 
 __S[13] = __S[5]:create_module({
     title = "Auto Parry",
@@ -11939,9 +20264,14 @@ __S[13] = __S[5]:create_module({
     flag = "auto_parry",
     notify = true,
     callback = function(r0)
-        u1070.config.auto_parry = r0
+        u1070.sapphire.SetAutoEnabled(r0)
     end
 })
+
+if u864._config._flags.auto_parry == false then __S[13]:change_state(false) end
+
+u1070.sapphire.ModeCards = u1070.sapphire.ModeCards or {}
+u1070.sapphire.ModeCards["Auto Parry"] = __S[13]
 
 local u1212 = __S[13]:create_slider({
     title = "Accuracy",
@@ -11957,6 +20287,12 @@ local u1212 = __S[13]:create_slider({
 
         u1070.config.accuracy = r0
     end
+})
+
+__S[13]:create_slider({
+    title = "Parry Range", flag = "sapphire_parry_range", value = 0,
+    minimum_value = 0, maximum_value = 10, decimals = 0,
+    callback = function(value) u1070.config.parry_range = value end
 })
 
 __S[13]:create_checkbox({
@@ -12004,7 +20340,7 @@ __S[13]:create_dropdown({
     maximum_options = 2,
     multi_dropdown = false,
     callback = function(r0)
-        u1070.config.parry_mode = r0
+        u1070.config.parry_mode = u864.normalize_parry_method(r0)
     end
 })
 
@@ -12016,6 +20352,7 @@ __S[13]:create_checkbox({
     notify = true,
     callback = function(r0)
         u1070.config.kill_pre_click = r0
+        if u1070.sapphire and u1070.sapphire.PreclickAll then u1070.sapphire.PreclickAll.Sync() end
     end
 })
 
@@ -12043,6 +20380,17 @@ __S[13]:create_slider({
     end
 })
 
+__S[13]:create_checkbox({
+    title = "Preclick for all",
+    description = "preclicks when any other player dies, even if you did not get the kill",
+    flag = "preclick_for_all",
+    notify = true,
+    callback = function(value)
+        u1070.config.preclick_for_all = value == true
+        if u1070.sapphire and u1070.sapphire.PreclickAll then u1070.sapphire.PreclickAll.Sync() end
+    end
+})
+
 __S[13]:create_divider({showtopic = true, title = "Abilities"})
 
 __S[13]:create_checkbox({
@@ -12051,6 +20399,20 @@ __S[13]:create_checkbox({
     callback = function(r0)
         u1070.ability.cooldown_protection = r0
     end
+})
+
+__S[13]:create_checkbox({
+    title = "Predictive Timing",
+    description = "predicts ball entry using relative motion, latency and frame timing",
+    flag = "predictive_timing",
+    notify = true,
+    callback = function(value) u1070.sapphire.Predictive.SetEnabled(value) end
+})
+
+__S[13]:create_checkbox({
+    title = "Animation Fix",
+    flag = "auto_parry_anim_fix",
+    callback = function(value) u1070.sapphire.SetAutoAnimation(value) end
 })
 
 __S[13]:create_checkbox({
@@ -12064,30 +20426,31 @@ __S[13]:create_checkbox({
 __S[13]:create_divider({showtopic = true, title = "Curve"})
 
 __S[13]:create_dropdown({
-    title = "Curve Mode",
-    flag = "curve_mode",
+    title = "Curve Method",
+    flag = "curve_method",
     options = u1073,
-    maximum_options = 7,
+    maximum_options = 5,
     multi_dropdown = false,
     keybind = true,
     notify = true,
-    callback = function(r0)
-        for r2, r3 in ipairs(u1073) do
-            if r3 == r0 then
-                u1070.config.curve_mode = r2
-                break
-            end
-        end
+    callback = function(value)
+        u1070.config.curve_method = u864.normalize_curve_method(value)
     end
 })
 
-__S[5]:create_module({
+u1070.sapphire.TriggerUIInitializing = true
+local triggerCard = __S[5]:create_module({
     title = "Triggerbot",
-    description = "fires when ball targets you",
+    description = "instantly parry if targeted",
     section = "left",
     flag = "triggerbot",
     notify = true,
     callback = function(r0)
+        if u1070.sapphire.TriggerUIInitializing and u864._config._flags.triggerbot == false then return end
+        if u1070.sapphire.TriggerUIInitializing and not u1070.config.is_mobile then
+            u1070.sapphire.InitialTriggerEnabled = r0
+            return
+        end
         if u1070.config.is_mobile then
             if r0 then
                 if not u1070.mobile_guis.triggerbot then
@@ -12124,7 +20487,7 @@ __S[5]:create_module({
                         end
 
                         if not r5 then
-                            r5 = u820.fromRGB(235, 235, 245)
+                            r5 = u820.fromRGB(235, 234, 239)
                         end
 
                         r2.TextColor3 = r5
@@ -12143,6 +20506,90 @@ __S[5]:create_module({
         end
     end
 })
+
+u1070.sapphire.ModeCards["Triggerbot"] = triggerCard
+if u864._config._flags.triggerbot == false then triggerCard:change_state(false) end
+
+triggerCard:create_dropdown({
+    title = "Triggerbot Type", flag = "sapphire_trigger_type", options = {"Remote", "Keypress"},
+    maximum_options = 2, multi_dropdown = false,
+    callback = function(value) u1070.sapphire.SetTriggerOption("mode", value) end
+})
+triggerCard:create_slider({
+    title = "Delay (MS)", flag = "sapphire_trigger_delay", value = 0,
+    minimum_value = 0, maximum_value = 200, decimals = 0,
+    callback = function(value) u1070.sapphire.SetTriggerOption("delay", value) end
+})
+triggerCard:create_checkbox({
+    title = "Randomize Delay", flag = "sapphire_trigger_randomize",
+    callback = function(value) u1070.sapphire.SetTriggerOption("randomize", value) end
+})
+triggerCard:create_doubleslider({
+    title = "Delay Range (MS)", flag = "sapphire_trigger_delay_range", value = {0, 200},
+    minimum_value = 0, maximum_value = 200, decimals = 0,
+    callback = function(low, high)
+        u1070.sapphire.SetTriggerOption("delay_min", low)
+        u1070.sapphire.SetTriggerOption("delay_max", high)
+    end
+})
+triggerCard:create_checkbox({
+    title = "Don't Parry On Ball Spawn", flag = "sapphire_trigger_ignore_spawn",
+    callback = function(value) u1070.sapphire.SetTriggerOption("ignore_spawn", value) end
+})
+
+ 
+u1070.sapphire.TriggerUIInitializing = false
+if not u1070.config.is_mobile then
+    u1070.sapphire.SetTriggerEnabled(u1070.sapphire.InitialTriggerEnabled == true)
+end
+u1070.sapphire.InitialTriggerEnabled = nil
+
+ 
+do
+    local T = u1070.target_player
+    local savedEnabled = u864._config._flags.target_player
+    local card = __S[5]:create_module({
+        title = "Target Player",
+        description = "locks parry aim to the selected player",
+        section = "right",
+        flag = "target_player",
+        notify = true,
+        callback = function(value) T.SetEnabled(value) end
+    })
+    T.Dropdown = card:create_dropdown({
+        title = "Target",
+        flag = "target_player_target",
+        options = T.PlayerList(),
+        maximum_options = 8,
+        search = true,
+        multi_dropdown = false,
+        callback = function(value) T.SetTarget(value, false, true) end
+    })
+    card:create_checkbox({
+        title = "Kill Switch",
+        flag = "target_player_kill_switch",
+        callback = function(value) T.SetKillSwitch(value) end
+    })
+    card:create_checkbox({
+        title = "Highlight Target",
+        flag = "target_player_highlight",
+        callback = function(value) T.SetHighlight(value) end
+    })
+     
+    local dropdown = T.Dropdown
+    local unfold = dropdown and dropdown.unfold_settings
+    if type(unfold) == "function" then
+        dropdown.unfold_settings = function(self)
+            if not self._state then T.RefreshList() end
+            return unfold(self)
+        end
+    end
+    if savedEnabled == false then card:change_state(false) end
+    T.Ready = true
+    T.SyncConfig()
+    T.RefreshList()
+    T.RefreshHighlight()
+end
 
 __S[13] = __S[5]:create_module({
     title = "Manual Spam",
@@ -12182,7 +20629,7 @@ __S[13] = __S[5]:create_module({
                         if u1070.spam.manual_enabled then
                             u1070.spam.manual_stop()
                             u1216.label.Text = "Spam"
-                            u1216.label.TextColor3 = u820.fromRGB(235, 235, 245)
+                            u1216.label.TextColor3 = u820.fromRGB(235, 234, 239)
                         else
                             u1070.spam.manual_start()
                             u1216.label.Text = "ON"
@@ -12207,25 +20654,27 @@ __S[13] = __S[5]:create_module({
 })
 
 __S[13]:create_dropdown({
-    title = "Spam Mode",
+    title = "Parry Method",
     flag = "manual_spam_mode",
     options = {"Remote", "Keypress"},
     maximum_options = 2,
     multi_dropdown = false,
     callback = function(r0)
-        u1070.spam.manual_mode = r0
+        u1070.spam.manual_mode = u864.normalize_parry_method(r0)
     end
 })
 
-if not u1070.config.is_mobile then
-    __S[13]:create_checkbox({
-        title = "Animation Fix",
-        flag = "manual_spam_anim_fix",
-        callback = function(r0)
-            u1070.spam.animation_fix_manual = r0
-        end
-    })
+__S[13]:create_checkbox({
+    title = "Animation Fix",
+    flag = "manual_spam_anim_fix",
+    callback = function(value) u1070.oxy_manual.SetAnimation("Manual", value) end
+})
+
+ 
+if not u1070.config.is_mobile and u864._config._flags.manual_spam == false then
+    __S[13]:change_state(false)
 end
+u1070.oxy_manual.Ready = true
 
 __S[13] = __S[5]:create_module({
     title = "Auto Spam",
@@ -12243,13 +20692,13 @@ __S[13] = __S[5]:create_module({
 })
 
 __S[13]:create_dropdown({
-    title = "Spam Mode",
+    title = "Parry Method",
     flag = "auto_spam_mode",
     options = {"Remote", "Keypress"},
     maximum_options = 2,
     multi_dropdown = false,
     callback = function(r0)
-        u1070.spam.auto_mode = r0
+        u1070.spam.auto_mode = u864.normalize_parry_method(r0)
     end
 })
 
@@ -12264,37 +20713,86 @@ __S[13]:create_slider({
     end
 })
 
-if not u1070.config.is_mobile then
-    __S[13]:create_checkbox({
-        title = "Animation Fix",
-        flag = "auto_spam_anim_fix",
-        callback = function(r0)
-            u1070.spam.animation_fix_auto = r0
-        end
+__S[13]:create_slider({
+    title = "Sensitivity Multiplier",
+    flag = "auto_spam_distance_multiplier",
+    value = 0.3,
+    minimum_value = 0.3,
+    maximum_value = 3,
+    decimals = 1,
+    callback = function(value) u1070.oxy_manual.SetDistanceMultiplier(value) end
+})
+
+__S[13]:create_checkbox({
+    title = "Animation Fix",
+    flag = "auto_spam_anim_fix",
+    callback = function(value) u1070.oxy_manual.SetAnimation("Auto", value) end
+})
+
+if u864._config._flags.auto_spam == false then __S[13]:change_state(false) end
+u1070.oxy_manual.AutoReady = true
+
+ 
+do
+    local F = u1070.sapphire
+    local descriptions = {
+        InfinityDetection = "waits for infinity to end before parrying",
+        DeathSlashDetection = "pauses normal parries during death slash",
+        FuryDetection = "tracks fury catches and combo hits",
+        SingularityDetection = "pauses parries while singularity is active",
+        TimeHoleDetection = "pauses parries during time hole",
+        FreezeDetection = "avoids parrying while your ball is frozen",
+        ForcefieldDetection = "pauses parries while your shield is active",
+        ParryOnDribble = "parries an opponent's highlighted dribble ball",
+        DribbleDetection = "waits for your dribble ball to return",
+        AntiPhantomEnabled = "responds when phantom targets your character",
+        AntiFlashCounterEnabled = "responds when flash counter targets you"
+    }
+    local function toggle(title, key, section, flag, description)
+        local saved = u864._config._flags[flag or ("sapphire_" .. key)]
+        local module = __S[6]:create_module({
+            title = title, description = description or descriptions[key] or "adjusts parry timing for active abilities",
+            section = section, flag = flag or ("sapphire_" .. key), notify = true,
+            callback = function(value) F.Set(key, value) end
+        })
+        if saved == false then module:change_state(false) end
+        return module
+    end
+    toggle("Infinity Detection", "InfinityDetection", "left", "detect_infinity")
+    local death = toggle("Death Slash Detection", "DeathSlashDetection", "right", "detect_deathslash")
+    death:create_checkbox({
+        title = "Do Minigame", flag = "sapphire_deathslash_minigame",
+        callback = function(value) F.Set("DeathSlashMinigame", value) end
     })
+    local fury = toggle("SOF Detection", "FuryDetection", "left", "sapphire_sof_detection")
+    fury:create_checkbox({title = "Auto Hit", flag = "sapphire_fury_auto_hit", callback = function(v) F.Set("FurySpamHit", v) end})
+    fury:create_dropdown({
+        title = "Parry Method", flag = "sapphire_fury_method", options = {"Remote", "Keypress"},
+        maximum_options = 2, multi_dropdown = false, callback = function(v) F.Set("FuryParryMethod", v) end
+    })
+    fury:create_slider({title = "Parry Amount", flag = "sapphire_fury_amount", value = 35, minimum_value = 1, maximum_value = 35,
+        callback = function(v) F.Set("FuryParryAmount", v) end})
+    fury:create_slider({title = "Parry Delay", flag = "sapphire_fury_delay", value = 0.05, minimum_value = 0.02, maximum_value = 0.25,
+        decimals = 2, callback = function(v) F.Set("FuryParryDelay", v) end})
+    toggle("Singularity Detection", "SingularityDetection", "left")
+    toggle("Time Hole Detection", "TimeHoleDetection", "left")
+    toggle("Freeze Detection", "FreezeDetection", "left")
+    toggle("Forcefield Detection", "ForcefieldDetection", "right")
+    toggle("Parry On Dribble", "ParryOnDribble", "right")
+    toggle("Parry On Self Dribble", "DribbleDetection", "right")
+     
+    local function counter(title, prefix, side)
+        local module = toggle(title, prefix .. "Enabled", side)
+        module:create_dropdown({title = "Mode", flag = "sapphire_" .. prefix .. "Mode", options = {"Legit", "Blatant"},
+            maximum_options = 2, multi_dropdown = false, callback = function(v) F.Set(prefix .. "Blatant", v == "Blatant") end})
+        module:create_dropdown({title = "Legit Type", flag = "sapphire_" .. prefix .. "Type", options = {"Spam", "Ability"},
+            maximum_options = 2, multi_dropdown = false, callback = function(v) F.Set(prefix .. "Type", v) end})
+    end
+    counter("Anti Phantom", "AntiPhantom", "right")
+    counter("Anti Flash Counter", "AntiFlashCounter", "right")
+    toggle("Anti Blindness", "AntiBlindness", "right", nil, "suppresses quasar blindness effects")
+    toggle("Anti Disorientate", "AntiDisorientate", "right", nil, "preserves camera orientation when quasar hits")
 end
-
-__S[6]:create_module({
-    title = "Infinity Detection",
-    description = "ignore infinity ball",
-    section = "left",
-    flag = "detect_infinity",
-    notify = true,
-    callback = function(r0)
-        u1070.detections.infinity = r0
-    end
-})
-
-__S[6]:create_module({
-    title = "Death Slash Detection",
-    description = "ignore death slash ball",
-    section = "right",
-    flag = "detect_deathslash",
-    notify = true,
-    callback = function(r0)
-        u1070.detections.deathslash = r0
-    end
-})
 
 __S[13] = __S[7]:create_module({
     title = "Ball Trail",
@@ -12611,12 +21109,16 @@ __S[13]:create_colorpicker({
     end
 })
 
-__S[7]:create_module({
+do
+local saved = u864._config._flags.ball_velocity
+local initializing = true
+local card = __S[7]:create_module({
     title = "Ball Velocity",
     description = "displays current and peak ball speed",
     section = "left",
     flag = "ball_velocity",
     callback = function(r0)
+        if initializing and saved == false then return end
         if r0 then
             u1070.ball_velocity.start()
         else
@@ -12624,6 +21126,9 @@ __S[7]:create_module({
         end
     end
 })
+if saved == false then card:change_state(false) end
+initializing = false
+end
 
 __S[7]:create_module({
     title = "Ball Indicator",
@@ -12857,7 +21362,7 @@ __S[6]:create_checkbox({
     end
 })
 
-__S[7] = __S[9]:create_module({
+__S[7] = __S[12]:create_module({
     title = "Sword Changer",
     description = "customizes sword appearance and effects",
     section = "left",
@@ -12905,7 +21410,7 @@ __S[7]:create_textbox({
     end
 })
 
-__S[10]:create_module({
+__S[12]:create_module({
     title = "Avatar Changer",
     description = "copies another player avatar",
     section = "left",
@@ -12945,7 +21450,7 @@ __S[10]:create_module({
     end
 })
 
-__S[10]:create_module({
+__S[12]:create_module({
     title = "Korblox",
     description = "replaces right leg with korblox mesh",
     section = "right",
@@ -12955,7 +21460,7 @@ __S[10]:create_module({
     end
 })
 
-__S[10]:create_module({
+__S[12]:create_module({
     title = "Headless",
     description = "makes head invisible",
     section = "right",
@@ -13073,106 +21578,8 @@ __S[9]:create_slider({
     end
 })
 
-__S[12]:create_module({
-    title = "Staff Detection",
-    description = "detects if staff members are in your game",
-    section = "left",
-    flag = "staff_detection",
-    callback = function(u1219)
-        if u1219 then
-            local u1220 = false
-            local u1221 = {}
-            local u1222 = u799(u796:GetService("TeleportService"))
 
-            local function u1223(u1224)
-                if u1221[u1224.UserId] ~= nil then
-                    return u1221[u1224.UserId]
-                end
 
-                local function r5()
-                    local r4 = u1224:IsInGroup(12836673) and u1224:GetRankInGroup(12836673) >= 2
-                    return r4
-                end
-
-                local r4, r5_2 = pcall(r5)
-
-                if r4 then
-                    u1221[u1224.UserId] = r5_2
-                    return r5_2
-                end
-
-                return false
-            end
-
-            local function u1225()
-                local r1 = u1054:GetPlayers()
-                local r3 = false
-
-                for r1_2, r2 in ipairs(r1) do
-                    if u1223(r2) then
-                        r3 = true
-                        break
-                    end
-
-                    r3 = false
-                end
-
-                if r3 and not u1220 then
-                    u1220 = true
-
-                    if u1070.staff_detection.mode == "Notify" then
-                        pcall(function()
-                            u864.SendNotification({title = "Staff Detection", text = "Possible staff detected in your game.", duration = 5})
-                        end)
-                    elseif u1070.staff_detection.mode == "Kick" then
-                        pcall(function()
-                            u864.SendNotification({title = "Staff Detection", text = "Staff detected. Disconnecting...", duration = 3})
-                        end)
-
-                        task.wait(1)
-                        u1222:Teleport(u796.PlaceId, u1061)
-                    end
-                elseif not r3 and u1220 then
-                    u1220 = false
-                end
-            end
-
-            local u1226 = true
-
-            task.spawn(function()
-                u1225()
-
-                while u1226 do
-                    task.wait(5)
-
-                    if not u1226 then
-                        break
-                    end
-
-                    u1225()
-                end
-            end)
-
-            u1069["Staff Detection"] = {
-                Disconnect = function()
-                    u1226 = false
-                end
-            }
-        elseif u1069["Staff Detection"] then
-            u1069["Staff Detection"]:Disconnect()
-            u1069["Staff Detection"] = nil
-        end
-    end
-}):create_dropdown({
-    title = "Detection Mode",
-    flag = "staff_detection_mode",
-    options = {"Notify", "Kick"},
-    maximum_options = 2,
-    multi_dropdown = false,
-    callback = function(r0)
-        u1070.staff_detection.mode = r0
-    end
-})
 
 u828.spawn(function()
     task.wait(3)
