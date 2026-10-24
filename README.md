@@ -102,22 +102,22 @@
 <h2 align="center">📊 GitHub Stats</h2>
 
 <p align="center">
-  <img src="https://github-readme-stats.vercel.app/api?username=Diandrare&show_icons=true&theme=radical&hide_border=true&count_private=true&include_all_commits=true&border_radius=12" height="180"/>
-  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=Diandrare&layout=compact&theme=radical&hide_border=true&langs_count=8&border_radius=12" height="180"/>
+  <img src="https://github-readme-stats.vercel.app/api?username=Diandrare&show_icons=true&theme=tokyonight&hide_border=true&count_private=true&include_all_commits=true&border_radius=12&title_color=ff69b4&icon_color=ff69b4&bg_color=1a1a2e" height="180"/>
+  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=Diandrare&layout=compact&theme=tokyonight&hide_border=true&langs_count=8&border_radius=12&title_color=ff69b4&bg_color=1a1a2e" height="180"/>
 </p>
 
 <p align="center">
-  <img src="https://github-readme-streak-stats.herokuapp.com/?user=Diandrare&theme=radical&hide_border=true&border_radius=12" />
+  <img src="https://github-readme-streak-stats.herokuapp.com/?user=Diandrare&theme=tokyonight&hide_border=true&border_radius=12&background=1a1a2e&stroke=1a1a2e&sideNums=ff69b4&ring=ff69b4" />
 </p>
 
 <!-- ═══════════════ TROPHIES ═══════════════ -->
 <p align="center">
-  <img src="https://github-profile-trophy.vercel.app/?username=Diandrare&theme=radical&no-frame=true&no-bg=true&row=1&column=7&margin-w=5" />
+  <img src="https://github-profile-trophy.vercel.app/?username=Diandrare&theme=tokyonight&no-frame=true&no-bg=true&row=1&column=7&margin-w=5" />
 </p>
 
 <!-- ═══════════════ ACTIVITY GRAPH ═══════════════ -->
 <p align="center">
-  <img src="https://github-readme-activity-graph.vercel.app/graph?username=Diandrare&theme=radical&hide_border=true&area=true&custom_title=Nika's%20Contribution%20Graph&radius=12" />
+  <img src="https://github-readme-activity-graph.vercel.app/graph?username=Diandrare&theme=tokyonight&hide_border=true&area=true&custom_title=Nika's%20Contribution%20Graph&radius=12&bg_color=1a1a2e&color=ff69b4&line=ff69b4&point=ffffff" />
 </p>
 
 <br/>
@@ -136,10 +136,10 @@
 
 <p align="center">
   <a href="https://github.com/Diandrare/ddollyss">
-    <img src="https://github-readme-stats.vercel.app/api/pin/?username=Diandrare&repo=ddollyss&theme=radical&hide_border=true&border_radius=12" />
+    <img src="https://github-readme-stats.vercel.app/api/pin/?username=Diandrare&repo=ddollyss&theme=tokyonight&hide_border=true&border_radius=12&title_color=ff69b4&icon_color=ff69b4&bg_color=1a1a2e" />
   </a>
   <a href="https://github.com/Diandrare/aboutnika">
-    <img src="https://github-readme-stats.vercel.app/api/pin/?username=Diandrare&repo=aboutnika&theme=radical&hide_border=true&border_radius=12" />
+    <img src="https://github-readme-stats.vercel.app/api/pin/?username=Diandrare&repo=aboutnika&theme=tokyonight&hide_border=true&border_radius=12&title_color=ff69b4&icon_color=ff69b4&bg_color=1a1a2e" />
   </a>
 </p>
 
@@ -169,7 +169,7 @@
 <h2 align="center">💬 Quote of the Day</h2>
 
 <p align="center">
-  <img src="https://quotes-github-readme.vercel.app/api?type=horizontal&theme=radical" />
+  <img src="https://quotes-github-readme.vercel.app/api?type=horizontal&theme=tokyonight" />
 </p>
 
 <br/>
