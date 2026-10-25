@@ -1,6 +1,6 @@
 local LibraryNotify = loadstring(game:HttpGet("https://gist.githubusercontent.com/AgentX771/930b5a9b78517ebfed75475fb3f6c9f6/raw/f20d3cc01b72d0ee6581e89b0e2bd3eba069c40e/gistfile1.txt"))()
 local Library = loadstring(game:HttpGet('https://raw.githubusercontent.com/AgentX771/ArgonHubX/refs/heads/main/UIArgon/ArgonRise.lua'))()
-for _, v in next, {"Argon Hub X", "Argon", "Hub X", "Arg", "Argon_Hub_X"} do
+for _, v in next, {"Argon Hub X", "Argon", "Hub X", "Arg", "Argon_Hub_L"} do
     pcall(delfolder, v)
 end
 local ESPLines = loadstring(game:HttpGet("https://raw.githubusercontent.com/AgentX771/ArgonHubX/refs/heads/main/Privating/ESPLines.lua"))()
