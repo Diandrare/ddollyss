@@ -73,7 +73,7 @@ _G.config = {
 if not isfolder("angeli/configs") then
     makefolder("angeli/configs")
 end
-local CONFIG_PATH = "angeli/configs/blade_ball.json"
+local CONFIG_PATH = "floxy/configs/blade_ball.json"
 
 local function save_cfg()
     writefile(CONFIG_PATH, HttpService:JSONEncode(_G.config))
